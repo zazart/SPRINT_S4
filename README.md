@@ -14,7 +14,7 @@ Projet web dynamique, ITU Andoharanofotsy
 
 ///////////////////////////////////////////// FRONTCONTROLLER SERVLET /////////////////////////////////////////////
 
-    Le développeur doit configurer dans le fichier xml du projet le FrontServlet 
+    Le développeur doit configurer dans le fichier xml du projet le FrontController
     Indiquer le package contenant ces fichiers annoté @Controller dans l'init-param
 
     <servlet>
