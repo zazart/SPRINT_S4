@@ -8,8 +8,6 @@ Projet web dynamique, ITU Andoharanofotsy
             Le mot "wilk" est un mot polonais qui veut dire loup,
         Les loups sont souvent associés à des traits tels que la force, l'agilité, et la collaboration en meute.
 
-\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
-
 
 
 
@@ -33,7 +31,6 @@ Projet web dynamique, ITU Andoharanofotsy
         <url-pattern>/</url-pattern> 
     </servlet-mapping>
 
-\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
 
 
 
