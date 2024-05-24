@@ -23,10 +23,9 @@ public class FrontController extends HttpServlet {
     @Override
     public void init() throws ServletException {
         super.init();
-        scan();
         controllerPackage = getInitParameter("controller-package");
+        scan();
     }
-
 
     protected void processRequest(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
         PrintWriter out = response.getWriter();
@@ -36,10 +35,12 @@ public class FrontController extends HttpServlet {
         String[] requestUrlSplitted = requestURL.toString().split("/");
         String map = requestUrlSplitted[requestUrlSplitted.length-1];
 
+
         if (urlMapping.containsKey(map)) {
             Mapping mapping = urlMapping.get(map);
-            out.println("<p><strong>URL :</strong> "+requestURL.toString()+"</p>");
+            out.println("<p><strong>chemin URL :</strong> "+requestURL.toString()+"</p>");
             out.println("<p><strong>Mapping :</strong> "+mapping.getClassName()+"</p>");
+            out.println("<p><strong>MethodName :</strong> "+mapping.getMethodName()+"</p>");
         }
         else {
             out.println("<p>Il n'y a pas de méthode associée à ce chemin</p>");
@@ -47,10 +48,17 @@ public class FrontController extends HttpServlet {
         out.close();
     }
     
+    @Override
+    protected void doGet(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
+        processRequest(request, response);
+    }
+
+    @Override
+    protected void doPost(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
+        processRequest(request, response);
+    }
 
 
-    
-    
     public void scan() {
         try {
             String classesPath = getServletContext().getRealPath("/WEB-INF/classes");
@@ -72,7 +80,7 @@ public class FrontController extends HttpServlet {
                                     if (item.isAnnotationPresent(Get.class)) {
                                         // Mapping(controller.name, method.name)
                                         Mapping mapping = new Mapping(className, item.getName());
-                                        
+
                                         Get get = item.getAnnotation(Get.class);
                                         String getValue = get.value();
 
@@ -90,23 +98,6 @@ public class FrontController extends HttpServlet {
         } catch (Exception e) {
             e.printStackTrace();
         }
-    }
-
-
-
-
-
-
-
-
-    @Override
-    protected void doGet(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
-        processRequest(request, response);
-    }
-    
-    @Override
-    protected void doPost(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
-        processRequest(request, response);
     }
 }
 
