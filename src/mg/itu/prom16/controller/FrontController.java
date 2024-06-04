@@ -1,6 +1,7 @@
 package mg.itu.prom16.controller;
 
 import mg.itu.prom16.annotation.*;
+import mg.itu.prom16.models.ModelView;
 import mg.itu.prom16.utils.*;
 
 import java.util.List;
@@ -13,6 +14,7 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import jakarta.servlet.RequestDispatcher;
 
 public class FrontController extends HttpServlet {
     private List<String> controller = new ArrayList<>();
@@ -48,9 +50,20 @@ public class FrontController extends HttpServlet {
     
                 Method method = classe.getMethod(mapping.getMethodName());
                 Object result = method.invoke(classInstance);
-                String retour = (String)result;
-                
-                out.println("<p><strong>Valeur de retour :</strong> "+retour);
+                if (result instanceof ModelView){
+                    ModelView mv = (ModelView) result;
+                    RequestDispatcher dispatch = request.getRequestDispatcher(mv.getUrl());
+                    Set<String> keys = mv.getData().keySet();
+                    for (String key : keys) {
+                        request.setAttribute(key, mv.getData().get(key));
+                        break;
+                    }
+                    dispatch.forward(request, response);
+                }
+                else {
+                    String retour = (String)result;
+                    out.println("<p><strong>Valeur de retour :</strong> "+retour);
+                }
             }
             catch (Exception e){
                 e.printStackTrace();

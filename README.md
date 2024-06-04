@@ -12,6 +12,12 @@ Projet web dynamique, ITU Andoharanofotsy
 
 
 
+
+
+
+
+
+
 ///////////////////////////////////////////// FRONTCONTROLLER SERVLET /////////////////////////////////////////////
 
     Le développeur doit configurer dans le fichier xml du projet le FrontController
@@ -35,6 +41,13 @@ Projet web dynamique, ITU Andoharanofotsy
 
 
 
+
+
+
+
+
+
+
 /////////////////////////////////////////////  RECUPERER LA CLASSE ET LA METHODE ASSOCIEES A UNE URL DONNEE  /////////////////////////////////////////////
     
     Annoter les méthodes des classes annoté @Controller par @Get("value") , remplacer "value" par la valeur de votre choix
@@ -51,5 +64,29 @@ Projet web dynamique, ITU Andoharanofotsy
 
 
 
+
+
+
+
+
+/////////////////////////////////////////// MODE D'UTILISATION DE L'ANNOTATION @Get ///////////////////////////////////////////////
+
+    L'annotation @Get est utilisé sur les méthodes des controlleurs , chaque méthode retournera un ModelView ou un String
+
+    cas du ModelView :
+        voici un exemple d'utilisation de l'annotation @Get
+            
+            @Get("link")
+            public ModelView votreMethod() {
+                ModelView mv = new ModelView("/destination.jsp");
+                ....
+                mv.addObject("votreClé", votreObjet);
+                return mv;
+            }
+
+    remarques : 
+      .L'url de la page destination doit toujours commencer par la racine du projet, donc si vous avez des sous dossiers contenant vos pages,  l'url doit ressembler à ceci ("/sousDossier/desination.jsp")
+    
+      .Utiliser la méthode addObject pour envoyer un Objet vers la page destination, récupérer la avec sa clé dans la page.
 
 
