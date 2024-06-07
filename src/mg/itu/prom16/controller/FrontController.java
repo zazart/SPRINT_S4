@@ -4,7 +4,6 @@ import mg.itu.prom16.annotation.*;
 import mg.itu.prom16.models.ModelView;
 import mg.itu.prom16.utils.*;
 
-import java.util.List;
 import java.io.*;
 import java.net.URLDecoder;
 import java.util.*;
@@ -20,29 +19,56 @@ public class FrontController extends HttpServlet {
     private List<String> controller = new ArrayList<>();
     private String controllerPackage;
     HashMap <String,Mapping> urlMapping = new HashMap<>() ;
+    Exception exception = new Exception("");
     
 
     @Override
     public void init() throws ServletException {
         super.init();
         controllerPackage = getInitParameter("controller-package");
-        scan();
+        if (controllerPackage == null || controllerPackage.isEmpty()) {
+            exception = new Exception("Le paramètre 'controller-package' doit être défini dans les paramètres d'initialisation.");
+        } else {
+            try {
+                scan();
+            } catch (Exception e) {
+                exception = e;
+            }
+        }
+
     }
 
     protected void processRequest(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
         PrintWriter out = response.getWriter();
-        StringBuffer requestURL = request.getRequestURL();
         response.setContentType("text/html");
-        
+
+        if (exception.getMessage()!=""){ 
+            out.println(exception.getMessage());
+        } else {
+            try {
+                String reponse = this.process(request, response);
+                out.println(reponse);
+            } catch (Exception e) {
+                out.println(e.getMessage());
+            }
+        }
+        out.close();
+    }
+
+
+
+    
+    public String process(HttpServletRequest request, HttpServletResponse response) throws Exception {
+        StringBuffer requestURL = request.getRequestURL();
         String[] requestUrlSplitted = requestURL.toString().split("/");
         String map = requestUrlSplitted[requestUrlSplitted.length-1];
-
+        String retour = "";
 
         if (urlMapping.containsKey(map)) {
             Mapping mapping = urlMapping.get(map);
-            out.println("<p><strong>chemin URL :</strong> "+requestURL.toString()+"</p>");
-            out.println("<p><strong>Mapping :</strong> "+mapping.getClassName()+"</p>");
-            out.println("<p><strong>MethodName :</strong> "+mapping.getMethodName()+"</p>");
+            retour+="<p><strong>chemin URL :</strong> "+requestURL.toString()+"</p>";
+            retour+="<p><strong>Mapping :</strong> "+mapping.getClassName()+"</p>";
+            retour+="<p><strong>MethodName :</strong> "+mapping.getMethodName()+"</p>";
 
             try {
                 Class<?> classe = Class.forName(mapping.getClassName());
@@ -59,34 +85,24 @@ public class FrontController extends HttpServlet {
                         break;
                     }
                     dispatch.forward(request, response);
+                } else if (result instanceof String){
+                    String val = (String)result;
+                    retour+="<p><strong>Valeur de retour :</strong> "+val;
+                } else {
+                    throw new Exception("<p>Le type de retour n'est ni un ModelView ni un String</p>");
                 }
-                else {
-                    String retour = (String)result;
-                    out.println("<p><strong>Valeur de retour :</strong> "+retour);
-                }
+            } catch (Exception e){
+                throw e;
             }
-            catch (Exception e){
-                e.printStackTrace();
-            }
-        }
-        else {
-            out.println("<p>Il n'y a pas de méthode associée à ce chemin</p>");
+        } else {
+            throw new Exception("<p>Il n'y a pas de méthode associée à ce chemin \""+requestURL+"\"</p>");
         }    
-        out.close();
-    }
-    
-    @Override
-    protected void doGet(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
-        processRequest(request, response);
-    }
-
-    @Override
-    protected void doPost(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
-        processRequest(request, response);
+        return retour;
     }
 
 
-    public void scan() {
+
+    public void scan() throws Exception{
         try {
             String classesPath = getServletContext().getRealPath("/WEB-INF/classes");
             String decodedPath = URLDecoder.decode(classesPath, "UTF-8");
@@ -112,19 +128,40 @@ public class FrontController extends HttpServlet {
                                         String getValue = get.value();
 
                                         // HashMap.associer(annotation.value, mapping)
-                                        urlMapping.put(getValue, mapping);
+                                        if (!urlMapping.containsKey(getValue)){
+                                            urlMapping.put(getValue, mapping);
+                                        } else {
+                                            throw new Exception("L'url \""+getValue+"\" apparaît plusieurs fois dans les controlleurs.");
+                                        }
                                     }
                                 }
                             }
                         } catch (ClassNotFoundException e) {
-                            e.printStackTrace();
+                            throw e;
                         }
                     }
+                    if (controller.size()==0) {
+                        throw new Exception("Il n'y aucun controller dans ce package");
+                    }
                 }
+            } else {
+                throw new Exception("Le package "+ controllerPackage +" n'existe pas");
             }
         } catch (Exception e) {
-            e.printStackTrace();
+            throw e;
         }
     }
+
+
+    @Override
+    protected void doGet(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
+        processRequest(request, response);
+    }
+    
+    @Override
+    protected void doPost(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
+        processRequest(request, response);
+    }
+
 }
 
