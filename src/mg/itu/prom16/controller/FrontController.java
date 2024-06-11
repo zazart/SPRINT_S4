@@ -63,6 +63,7 @@ public class FrontController extends HttpServlet {
         String[] requestUrlSplitted = requestURL.toString().split("/");
         String map = requestUrlSplitted[requestUrlSplitted.length-1];
         String retour = "";
+        if (requestUrlSplitted.length <=4 ) {map = "/" ;}
 
         if (urlMapping.containsKey(map)) {
             Mapping mapping = urlMapping.get(map);
