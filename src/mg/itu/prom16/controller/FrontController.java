@@ -8,7 +8,11 @@ import java.io.*;
 import java.net.URLDecoder;
 import java.util.*;
 
+import javax.management.ObjectName;
+
 import java.lang.reflect.Method;
+import java.lang.reflect.Parameter;
+
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
@@ -33,6 +37,7 @@ public class FrontController extends HttpServlet {
                 scan();
             } catch (Exception e) {
                 exception = e;
+                e.printStackTrace();
             }
         }
 
@@ -50,6 +55,7 @@ public class FrontController extends HttpServlet {
                 out.println(reponse);
             } catch (Exception e) {
                 out.println(e.getMessage());
+                e.printStackTrace();
             }
         }
         out.close();
@@ -63,6 +69,7 @@ public class FrontController extends HttpServlet {
         String[] requestUrlSplitted = requestURL.toString().split("/");
         String map = requestUrlSplitted[requestUrlSplitted.length-1];
         String retour = "";
+        if (requestUrlSplitted.length <=4 ) {map = "/" ;}
 
         if (urlMapping.containsKey(map)) {
             Mapping mapping = urlMapping.get(map);
@@ -74,22 +81,73 @@ public class FrontController extends HttpServlet {
                 Class<?> classe = Class.forName(mapping.getClassName());
                 Object classInstance = classe.getDeclaredConstructor().newInstance();
     
-                Method method = classe.getMethod(mapping.getMethodName());
-                Object result = method.invoke(classInstance);
-                if (result instanceof ModelView){
-                    ModelView mv = (ModelView) result;
-                    RequestDispatcher dispatch = request.getRequestDispatcher(mv.getUrl());
-                    Set<String> keys = mv.getData().keySet();
-                    for (String key : keys) {
-                        request.setAttribute(key, mv.getData().get(key));
-                        break;
+                Boolean paramExist = false;
+                Method[] methods = classInstance.getClass().getDeclaredMethods();
+                for (Method item : methods) {
+                    if (item.getName().equals(mapping.getMethodName())) {
+                        paramExist = item.getParameterCount() > 0;
                     }
-                    dispatch.forward(request, response);
-                } else if (result instanceof String){
-                    String val = (String)result;
-                    retour+="<p><strong>Valeur de retour :</strong> "+val;
+                }
+                if (paramExist) {
+                    Parameter[] listeParam = null;                    
+                    for (Method item : methods) {
+                        if (item.getName().equals(mapping.getMethodName())) {
+                            listeParam = item.getParameters();
+                            break;
+                        }
+                    }
+                    Object[] values = new Object[listeParam.length];
+                    Enumeration<String> parameterNames = request.getParameterNames();
+                    for (int i = 0; i < values.length; i++) {
+                        boolean isNull = true;
+                        while (parameterNames.hasMoreElements()) {
+                            String name = parameterNames.nextElement();
+                            if (name.equals(listeParam[i].getName())) {
+                                values[i] =CastTo.castParameter(request.getParameter(name), listeParam[i].getParameterizedType().getTypeName());
+                                isNull = false;
+                                break;
+                            }
+                            if (listeParam[i].isAnnotationPresent(Param.class)) {
+                                if (name.equals(listeParam[i].getAnnotation(Param.class).value())) {
+                                    values[i] =CastTo.castParameter(request.getParameter(name), listeParam[i].getParameterizedType().getTypeName());
+                                    isNull = false;
+                                    break;
+                                }
+                            }
+                        }
+                        if (isNull) {
+                            values[i] = null;
+                        }
+                    }
+
+                    Class<?>[] parameterTypes;
+                    parameterTypes = new Class<?>[values.length];
+                    for (int i = 0; i < values.length; i++) {
+                        if (values[i] instanceof Integer) {
+                            parameterTypes[i] = int.class;
+                        } else if (values[i] instanceof Double) {
+                            parameterTypes[i] = double.class;
+                        } else if (values[i] instanceof Boolean) {
+                            parameterTypes[i] = boolean.class;
+                        } else if (values[i] instanceof Long) {
+                            parameterTypes[i] = long.class;
+                        } else if (values[i] instanceof Float) {
+                            parameterTypes[i] = float.class;
+                        } else if (values[i] instanceof Short) {
+                            parameterTypes[i] = short.class;
+                        } else if (values[i] instanceof Byte) {
+                            parameterTypes[i] = byte.class;
+                        } else {
+                            parameterTypes[i] = values[i].getClass();
+                        }
+                    }
+                    Method method = classe.getDeclaredMethod(mapping.getMethodName(), parameterTypes);
+                    Object result = method.invoke(classInstance,values);
+                    retour += resultHandler(result, request, response);
                 } else {
-                    throw new Exception("<p>Le type de retour n'est ni un ModelView ni un String</p>");
+                    Method method = classe.getMethod(mapping.getMethodName());
+                    Object result = method.invoke(classInstance);
+                    retour += resultHandler(result, request, response);
                 }
             } catch (Exception e){
                 throw e;
@@ -99,6 +157,39 @@ public class FrontController extends HttpServlet {
         }    
         return retour;
     }
+
+
+
+
+
+
+
+    public static String resultHandler(Object result, HttpServletRequest request, HttpServletResponse response) throws Exception {
+        String retour = "";
+        if (result instanceof ModelView){
+            ModelView mv = (ModelView) result;
+            RequestDispatcher dispatch = request.getRequestDispatcher(mv.getUrl());
+            Set<String> keys = mv.getData().keySet();
+            for (String key : keys) {
+                request.setAttribute(key, mv.getData().get(key));
+            }
+            dispatch.forward(request, response);
+        } else if (result instanceof String){
+            String val = (String)result;
+            retour+="<p><strong>Valeur de retour :</strong> "+val;
+        } else {
+            throw new Exception("<p>Le type de retour n'est ni un ModelView ni un String</p>");
+        }
+        return retour;
+    }
+
+
+
+
+
+
+
+
 
 
 
