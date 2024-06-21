@@ -7,9 +7,7 @@ import mg.itu.prom16.utils.*;
 import java.io.*;
 import java.net.URLDecoder;
 import java.util.*;
-
-import javax.management.ObjectName;
-
+import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
 
@@ -51,7 +49,7 @@ public class FrontController extends HttpServlet {
             out.println(exception.getMessage());
         } else {
             try {
-                String reponse = this.process(request, response);
+                String reponse = this.subProcess(request, response);
                 out.println(reponse);
             } catch (Exception e) {
                 out.println(e.getMessage());
@@ -64,7 +62,7 @@ public class FrontController extends HttpServlet {
 
 
     
-    public String process(HttpServletRequest request, HttpServletResponse response) throws Exception {
+    public String subProcess(HttpServletRequest request, HttpServletResponse response) throws Exception {
         StringBuffer requestURL = request.getRequestURL();
         String[] requestUrlSplitted = requestURL.toString().split("/");
         String map = requestUrlSplitted[requestUrlSplitted.length-1];
@@ -89,6 +87,7 @@ public class FrontController extends HttpServlet {
                     }
                 }
                 if (paramExist) {
+                // listeParam as parameters of the method
                     Parameter[] listeParam = null;                    
                     for (Method item : methods) {
                         if (item.getName().equals(mapping.getMethodName())) {
@@ -97,27 +96,62 @@ public class FrontController extends HttpServlet {
                         }
                     }
                     Object[] values = new Object[listeParam.length];
-                    Enumeration<String> parameterNames = request.getParameterNames();
+                // formParameterNames as parameters of the request 
+                    Enumeration<String> formParameterNames = request.getParameterNames();
                     for (int i = 0; i < values.length; i++) {
-                        boolean isNull = true;
-                        while (parameterNames.hasMoreElements()) {
-                            String name = parameterNames.nextElement();
-                            if (name.equals(listeParam[i].getName())) {
-                                values[i] =CastTo.castParameter(request.getParameter(name), listeParam[i].getParameterizedType().getTypeName());
-                                isNull = false;
-                                break;
+                        // Begin change
+                        String paramName = listeParam[i].getName();
+                        if (listeParam[i].isAnnotationPresent(Param.class)) {
+                            paramName = listeParam[i].getAnnotation(Param.class).value();
+                        }
+                        if (!listeParam[i].getClass().isPrimitive() && listeParam[i].getType().isAnnotationPresent(Objet.class)) {
+                            Class<?> clazz = Class.forName(listeParam[i].getParameterizedType().getTypeName());
+                            Object obj = clazz.getDeclaredConstructor().newInstance();
+                            Field[] fields = obj.getClass().getDeclaredFields();
+                            Object[] valuesObject = new Object[fields.length];
+                            while (formParameterNames.hasMoreElements()) {
+                                String name = formParameterNames.nextElement();
+                                for (int j = 0; j < fields.length; j++) {
+                                    if (name.startsWith(paramName+".")) {
+                                        int indexSuite = (paramName + ".").length();
+                                        String paramSimpleName = name.substring(indexSuite);
+                                        if (fields[j].isAnnotationPresent(AttribObjet.class)){
+                                            if (paramSimpleName.equals(fields[j].getAnnotation(AttribObjet.class).value())){
+                                                valuesObject[j] = CastTo.castParameter(request.getParameter(name), fields[j].getType().getName());
+                                            }
+                                        } else {
+                                            if (paramSimpleName.equals(fields[j].getName())){
+                                                valuesObject[j] = CastTo.castParameter(request.getParameter(name), fields[j].getType().getName());
+                                            } 
+                                        }
+                                    }
+                                }
                             }
-                            if (listeParam[i].isAnnotationPresent(Param.class)) {
-                                if (name.equals(listeParam[i].getAnnotation(Param.class).value())) {
+                            obj = process(obj, valuesObject);
+                            values[i] = obj;
+                        }
+                        else {
+                            boolean isNull = true;
+                            while (formParameterNames.hasMoreElements()) {
+                                String name = formParameterNames.nextElement();
+                                if (name.equals(listeParam[i].getName())) {
                                     values[i] =CastTo.castParameter(request.getParameter(name), listeParam[i].getParameterizedType().getTypeName());
                                     isNull = false;
                                     break;
                                 }
+                                if (listeParam[i].isAnnotationPresent(Param.class)) {
+                                    if (name.equals(listeParam[i].getAnnotation(Param.class).value())) {
+                                        values[i] =CastTo.castParameter(request.getParameter(name), listeParam[i].getParameterizedType().getTypeName());
+                                        isNull = false;
+                                        break;
+                                    }
+                                }
+                            }
+                            if (isNull) {
+                                values[i] = null;
                             }
                         }
-                        if (isNull) {
-                            values[i] = null;
-                        }
+                        // End change
                     }
 
                     Class<?>[] parameterTypes;
@@ -160,6 +194,22 @@ public class FrontController extends HttpServlet {
 
 
 
+    public static <T> T  process(T obj, Object[] valueObjects) throws Exception {
+        Class<?> classe = obj.getClass();
+        Field[] fields = classe.getDeclaredFields();
+
+        for (int i = 0; i < fields.length; i++) {
+            Field field = fields[i];
+            field.setAccessible(true);
+            Object valeur = valueObjects[i];
+            if(valeur != null){
+                field.set(obj, valeur);
+            } else {
+                field.set(obj, null);
+            }
+        }
+        return obj;
+    }
 
 
 

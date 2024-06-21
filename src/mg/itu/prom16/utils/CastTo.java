@@ -26,33 +26,33 @@ public class CastTo {
     } 
 
     public static Object castParameter(String value, String type) throws Exception {
-        Class<?> clazz = checkClassForName(type);
+        Class<?> classe = checkClassForName(type);
         if (value == null) {
-            if (clazz == String.class) {
+            if (classe == String.class) {
                 return "";
-            } else if (clazz == Integer.class || clazz == int.class) {
+            } else if (classe == Integer.class || classe == int.class) {
                 return 0;
-            } else if (clazz == Double.class || clazz == double.class) {
+            } else if (classe == Double.class || classe == double.class) {
                 return 0.0;
             }
             return null;
         }
 
-        if (clazz == String.class) {
+        if (classe == String.class) {
             return value;
-        } else if (clazz == Integer.class || clazz == int.class) {
+        } else if (classe == Integer.class || classe == int.class) {
             return Integer.parseInt(value);
-        } else if (clazz == Double.class || clazz == double.class) {
+        } else if (classe == Double.class || classe == double.class) {
             return Double.parseDouble(value);
-        } else if (clazz == Boolean.class || clazz == boolean.class) {
+        } else if (classe == Boolean.class || classe == boolean.class) {
             return Boolean.parseBoolean(value);
-        } else if (clazz == Long.class || clazz == long.class) {
+        } else if (classe == Long.class || classe == long.class) {
             return Long.parseLong(value);
-        } else if (clazz == Float.class || clazz == float.class) {
+        } else if (classe == Float.class || classe == float.class) {
             return Float.parseFloat(value);
-        } else if (clazz == Short.class || clazz == short.class) {
+        } else if (classe == Short.class || classe == short.class) {
             return Short.parseShort(value);
-        } else if (clazz == Byte.class || clazz == byte.class) {
+        } else if (classe == Byte.class || classe == byte.class) {
             return Byte.parseByte(value);
         } else {
             throw new Exception("Erreur de cast sur "+type);
