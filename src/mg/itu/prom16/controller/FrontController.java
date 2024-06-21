@@ -101,6 +101,9 @@ public class FrontController extends HttpServlet {
                     for (int i = 0; i < values.length; i++) {
                         // Begin change
                         String paramName = listeParam[i].getName();
+                        if (listeParam[i].isAnnotationPresent(Param.class)) {
+                            paramName = listeParam[i].getAnnotation(Param.class).value();
+                        }
                         if (!listeParam[i].getClass().isPrimitive() && listeParam[i].getType().isAnnotationPresent(Objet.class)) {
                             Class<?> clazz = Class.forName(listeParam[i].getParameterizedType().getTypeName());
                             Object obj = clazz.getDeclaredConstructor().newInstance();
