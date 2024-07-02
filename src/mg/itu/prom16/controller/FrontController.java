@@ -96,17 +96,22 @@ public class FrontController extends HttpServlet {
                         }
                     }
                     Object[] values = new Object[listeParam.length];
-                // formParameterNames as parameters of the request 
+                    // formParameterNames as parameters of the request 
                     Enumeration<String> formParameterNames = request.getParameterNames();
                     for (int i = 0; i < values.length; i++) {
                         // Begin change
                         String paramName = listeParam[i].getName();
                         if (listeParam[i].isAnnotationPresent(Param.class)) {
                             paramName = listeParam[i].getAnnotation(Param.class).value();
+                        } else {
+                            String errorMess = "vous n'avez pas annoté le paramètre '"+paramName+"' par @Param(\"...\")"  ;
+                            throw new Exception("<p>ETU-002415 : "+errorMess+"</p>");
                         }
+                        
                         if (!listeParam[i].getClass().isPrimitive() && listeParam[i].getType().isAnnotationPresent(Objet.class)) {
                             Class<?> clazz = Class.forName(listeParam[i].getParameterizedType().getTypeName());
                             Object obj = clazz.getDeclaredConstructor().newInstance();
+
                             Field[] fields = obj.getClass().getDeclaredFields();
                             Object[] valuesObject = new Object[fields.length];
                             while (formParameterNames.hasMoreElements()) {
@@ -134,17 +139,10 @@ public class FrontController extends HttpServlet {
                             boolean isNull = true;
                             while (formParameterNames.hasMoreElements()) {
                                 String name = formParameterNames.nextElement();
-                                if (name.equals(listeParam[i].getName())) {
+                                if (name.equals(paramName)) {
                                     values[i] =CastTo.castParameter(request.getParameter(name), listeParam[i].getParameterizedType().getTypeName());
                                     isNull = false;
                                     break;
-                                }
-                                if (listeParam[i].isAnnotationPresent(Param.class)) {
-                                    if (name.equals(listeParam[i].getAnnotation(Param.class).value())) {
-                                        values[i] =CastTo.castParameter(request.getParameter(name), listeParam[i].getParameterizedType().getTypeName());
-                                        isNull = false;
-                                        break;
-                                    }
                                 }
                             }
                             if (isNull) {
@@ -153,7 +151,6 @@ public class FrontController extends HttpServlet {
                         }
                         // End change
                     }
-
                     Class<?>[] parameterTypes;
                     parameterTypes = new Class<?>[values.length];
                     for (int i = 0; i < values.length; i++) {
