@@ -78,7 +78,17 @@ public class FrontController extends HttpServlet {
             try {
                 Class<?> classe = Class.forName(mapping.getClassName());
                 Object classInstance = classe.getDeclaredConstructor().newInstance();
-    
+
+                Field[] attributs = classInstance.getClass().getDeclaredFields();
+                for (Field item : attributs) {
+                    if (item.getType().equals(CustomSession.class)) {
+                        item.setAccessible(true);
+                        CustomSession session = new CustomSession();
+                        session.setMySession(request.getSession());
+                        item.set(classInstance, session);
+                    }
+                }
+
                 Boolean paramExist = false;
                 Method[] methods = classInstance.getClass().getDeclaredMethods();
                 for (Method item : methods) {
@@ -103,7 +113,7 @@ public class FrontController extends HttpServlet {
                         String paramName = listeParam[i].getName();
                         if (listeParam[i].isAnnotationPresent(Param.class)) {
                             paramName = listeParam[i].getAnnotation(Param.class).value();
-                        } else {
+                        } else if (!listeParam[i].getType().equals(CustomSession.class)){
                             String errorMess = "vous n'avez pas annoté le paramètre '"+paramName+"' par @Param(\"...\")"  ;
                             throw new Exception("<p>ETU-002415 : "+errorMess+"</p>");
                         }
@@ -134,6 +144,11 @@ public class FrontController extends HttpServlet {
                             }
                             obj = process(obj, valuesObject);
                             values[i] = obj;
+                        }
+                        else if (listeParam[i].getType().equals(CustomSession.class)) {
+                            CustomSession session = new CustomSession();
+                            session.setMySession(request.getSession());
+                            values[i] = session;
                         }
                         else {
                             boolean isNull = true;
