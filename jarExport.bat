@@ -1,10 +1,13 @@
 @echo off
 @REM example of using this script >jarExport.bat "." "." "wilk" "C:\Program Files\Apache Software Foundation\Tomcat 10.1_Tomcat10.1.7\lib\servlet-api.jar"
 
-set "working_dir=%~1"
-set "local=%~2"
-set "name=%~3"
+@REM set "working_dir=%~1"
+@REM set "local=%~2"
+@REM set "name=%~3"
 @REM set "servletLink=%~4"
+set "working_dir=."
+set "local=."
+set "name=wilk"
 set "servletLink=C:\Program Files\Apache Software Foundation\Tomcat 10.1_Tomcat10.1.7\lib\servlet-api.jar"
 
 if "%working_dir%"=="" (
@@ -36,7 +39,7 @@ for /r "%working_dir%\src" %%f in (*.java) do copy "%%f" "%local%\out"
 echo Copie avec succes
 
 echo Compilation de toute ces fichiers
-javac -parameters -cp "%servletLink%" -d "%local%" "%local%\out\*.java"
+javac -parameters -cp "%local%\lib\*" -d "%local%" "%local%\out\*.java"
 
 jar -cf "%name%.jar" %local%\mg
 

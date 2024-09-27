@@ -7,6 +7,9 @@ import mg.itu.prom16.utils.*;
 import java.io.*;
 import java.net.URLDecoder;
 import java.util.*;
+
+import com.google.gson.Gson;
+
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
@@ -16,6 +19,7 @@ import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.RequestDispatcher;
+
 
 public class FrontController extends HttpServlet {
     private List<String> controller = new ArrayList<>();
@@ -43,7 +47,6 @@ public class FrontController extends HttpServlet {
 
     protected void processRequest(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
         PrintWriter out = response.getWriter();
-        response.setContentType("text/html");
 
         if (exception.getMessage()!=""){ 
             out.println(exception.getMessage());
@@ -71,9 +74,6 @@ public class FrontController extends HttpServlet {
 
         if (urlMapping.containsKey(map)) {
             Mapping mapping = urlMapping.get(map);
-            retour+="<p><strong>chemin URL :</strong> "+requestURL.toString()+"</p>";
-            retour+="<p><strong>Mapping :</strong> "+mapping.getClassName()+"</p>";
-            retour+="<p><strong>MethodName :</strong> "+mapping.getMethodName()+"</p>";
 
             try {
                 Class<?> classe = Class.forName(mapping.getClassName());
@@ -189,12 +189,13 @@ public class FrontController extends HttpServlet {
                     }
                     Method method = classe.getDeclaredMethod(mapping.getMethodName(), parameterTypes);
                     Object result = method.invoke(classInstance,values);
-                    retour += resultHandler(result, request, response);
+                    retour += resultHandler(result, request, response, method);
                 } else {
                     Method method = classe.getMethod(mapping.getMethodName());
                     Object result = method.invoke(classInstance);
-                    retour += resultHandler(result, request, response);
+                    retour += resultHandler(result, request, response, method);
                 }
+            
             } catch (Exception e){
                 throw e;
             }
@@ -226,8 +227,9 @@ public class FrontController extends HttpServlet {
 
 
 
-    public static String resultHandler(Object result, HttpServletRequest request, HttpServletResponse response) throws Exception {
+    public static String resultHandler(Object result, HttpServletRequest request, HttpServletResponse response, Method method) throws Exception {
         String retour = "";
+        Gson gson = new Gson();
         if (result instanceof ModelView){
             ModelView mv = (ModelView) result;
             RequestDispatcher dispatch = request.getRequestDispatcher(mv.getUrl());
@@ -235,10 +237,20 @@ public class FrontController extends HttpServlet {
             for (String key : keys) {
                 request.setAttribute(key, mv.getData().get(key));
             }
-            dispatch.forward(request, response);
+            if (method.isAnnotationPresent(Restapi.class)) {
+                response.setContentType("text/json");
+                retour += gson.toJson(mv.getData());
+            } else {
+                dispatch.forward(request, response);
+            }
         } else if (result instanceof String){
             String val = (String)result;
-            retour+="<p><strong>Valeur de retour :</strong> "+val;
+            if (method.isAnnotationPresent(Restapi.class)) {
+                response.setContentType("text/json");
+                retour += gson.toJson(val);
+            } else {
+                retour+="<p><strong>Valeur de retour :</strong> "+val;
+            }
         } else {
             throw new Exception("<p>Le type de retour n'est ni un ModelView ni un String</p>");
         }
