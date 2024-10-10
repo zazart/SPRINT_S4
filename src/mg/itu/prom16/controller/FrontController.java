@@ -74,6 +74,10 @@ public class FrontController extends HttpServlet {
 
         if (urlMapping.containsKey(map)) {
             Mapping mapping = urlMapping.get(map);
+        
+            if (!request.getMethod().equals(mapping.getVerb())) {
+                throw new Exception("Le verb au niveau de la method ne correspond pas au method de la requete");
+            }
 
             try {
                 Class<?> classe = Class.forName(mapping.getClassName());
@@ -285,18 +289,24 @@ public class FrontController extends HttpServlet {
 
                                 Method[] methods = classe.getMethods();
                                 for (Method item : methods) {
-                                    if (item.isAnnotationPresent(Get.class)) {
+                                    if (item.isAnnotationPresent(Url.class)) {
                                         // Mapping(controller.name, method.name)
                                         Mapping mapping = new Mapping(className, item.getName());
 
-                                        Get get = item.getAnnotation(Get.class);
-                                        String getValue = get.value();
+                                        if (item.isAnnotationPresent(Post.class)){
+                                            mapping.setVerb("POST");
+                                        } else {
+                                            mapping.setVerb("GET");
+                                        }
+
+                                        Url url = item.getAnnotation(Url.class);
+                                        String urlValue = url.value();
 
                                         // HashMap.associer(annotation.value, mapping)
-                                        if (!urlMapping.containsKey(getValue)){
-                                            urlMapping.put(getValue, mapping);
+                                        if (!urlMapping.containsKey(urlValue)){
+                                            urlMapping.put(urlValue, mapping);
                                         } else {
-                                            throw new Exception("L'url \""+getValue+"\" apparaît plusieurs fois dans les controlleurs.");
+                                            throw new Exception("L'url \""+urlValue+"\" apparaît plusieurs fois dans les controlleurs.");
                                         }
                                     }
                                 }

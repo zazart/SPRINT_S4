@@ -3,6 +3,7 @@ package mg.itu.prom16.utils;
 public class Mapping {
     String className;
     String methodName;
+    String verb; 
 
     public Mapping(String className, String methodName) {
         this.className = className;
@@ -21,6 +22,14 @@ public class Mapping {
     }
     public String getMethodName() {
         return methodName;
+    }
+
+    public String getVerb() {
+        return verb;
+    }
+
+    public void setVerb(String verb) {
+        this.verb = verb;
     }
 
 }
