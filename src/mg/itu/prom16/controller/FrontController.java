@@ -25,21 +25,63 @@ import jakarta.servlet.RequestDispatcher;
 public class FrontController extends HttpServlet {
     private List<String> controller = new ArrayList<>();
     private String controllerPackage;
-    HashMap <String,Mapping> urlMapping = new HashMap<>() ;
-    Exception exception = new Exception("");
+    private HashMap <String,Mapping> urlMapping = new HashMap<>() ;
+    private Exception exception = new Exception("");
+    private String statusCode = "200";
     
+    public void setStatusCode(String statusCode) {
+        this.statusCode = statusCode;
+    }
+
+    public String getStatusCode() {
+        return statusCode;
+    }
+
+    public List<String> getController() {
+        return controller;
+    }
+
+    public void setController(List<String> controller) {
+        this.controller = controller;
+    }
+
+    public String getControllerPackage() {
+        return controllerPackage;
+    }
+
+    public void setControllerPackage(String controllerPackage) {
+        this.controllerPackage = controllerPackage;
+    }
+
+    public HashMap<String, Mapping> getUrlMapping() {
+        return urlMapping;
+    }
+
+    public void setUrlMapping(HashMap<String, Mapping> urlMapping) {
+        this.urlMapping = urlMapping;
+    }
+
+    public Exception getException() {
+        return exception;
+    }
+
+    public void setException(Exception exception) {
+        this.exception = exception;
+    }
+
+
 
     @Override
     public void init() throws ServletException {
         super.init();
-        controllerPackage = getInitParameter("controller-package");
-        if (controllerPackage == null || controllerPackage.isEmpty()) {
-            exception = new Exception("Le paramètre 'controller-package' doit être défini dans les paramètres d'initialisation.");
+        this.setControllerPackage(getInitParameter("controller-package"));
+        if (this.getControllerPackage() == null || this.getControllerPackage().isEmpty()) {
+            this.setException(new Exception("Le paramètre 'controller-package' doit être défini dans les paramètres d'initialisation."));
         } else {
             try {
                 scan();
             } catch (Exception e) {
-                exception = e;
+                this.setException(e);
                 e.printStackTrace();
             }
         }
@@ -49,15 +91,14 @@ public class FrontController extends HttpServlet {
     protected void processRequest(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
         PrintWriter out = response.getWriter();
 
-        if (exception.getMessage()!=""){ 
-            out.println(exception.getMessage());
+        if (this.getException().getMessage()!=""){ 
+            response.sendError(Integer.parseInt(this.getStatusCode()), this.getException().getMessage());
         } else {
             try {
                 String reponse = this.subProcess(request, response);
                 out.println(reponse);
             } catch (Exception e) {
-                out.println(e.getMessage());
-                e.printStackTrace();
+                response.sendError(Integer.parseInt(this.getStatusCode()), e.getMessage());
             }
         }
         out.close();
@@ -73,8 +114,8 @@ public class FrontController extends HttpServlet {
         String retour = "";
         if (requestUrlSplitted.length <=4 ) {map = "/" ;}
 
-        if (urlMapping.containsKey(map)) {
-            Mapping mapping = urlMapping.get(map);
+        if (this.getUrlMapping().containsKey(map)) {
+            Mapping mapping = this.getUrlMapping().get(map);
             String verb = request.getMethod();
             int idverb = 0;
             for (int i=0; i < mapping.getListVerbMethod().size(); i++) {
@@ -87,6 +128,7 @@ public class FrontController extends HttpServlet {
                 String methodVerb = mapping.getListVerbMethod().get(idverb).getVerb();
                 String methodName = mapping.getListVerbMethod().get(idverb).getMethodName();
                 if (!verb.equals(methodVerb)) {
+                    this.setStatusCode("500");
                     throw new Exception("Le verb "+methodVerb+" au niveau de la methode ne correspond pas au method de la requete : "+verb );
                 }
 
@@ -129,6 +171,7 @@ public class FrontController extends HttpServlet {
                             paramName = listeParam[i].getAnnotation(Param.class).value();
                         } else if (!listeParam[i].getType().equals(CustomSession.class)){
                             String errorMess = "vous n'avez pas annoté le paramètre '"+paramName+"' par @Param(\"...\")"  ;
+                            this.setStatusCode("500");
                             throw new Exception("<p>ETU-002415 : "+errorMess+"</p>");
                         }
                         
@@ -214,6 +257,7 @@ public class FrontController extends HttpServlet {
                 throw e;
             }
         } else {
+            this.setStatusCode("404");
             throw new Exception("<p>Il n'y a pas de méthode associée à ce chemin \""+requestURL+"\"</p>");
         }    
         return retour;
@@ -285,17 +329,17 @@ public class FrontController extends HttpServlet {
         try {
             String classesPath = getServletContext().getRealPath("/WEB-INF/classes");
             String decodedPath = URLDecoder.decode(classesPath, "UTF-8");
-            String packagePath = decodedPath +"\\"+ controllerPackage.replace('.', '\\');
+            String packagePath = decodedPath +"\\"+ this.getControllerPackage().replace('.', '\\');
             File packageDirectory = new File(packagePath);
             if (packageDirectory.exists() && packageDirectory.isDirectory()) {
                 File[] classFiles = packageDirectory.listFiles((dir, name) -> name.endsWith(".class"));
                 if (classFiles != null) {
                     for (File classFile : classFiles) {
-                        String className = controllerPackage + '.' + classFile.getName().substring(0, classFile.getName().length() - 6);
+                        String className = this.getControllerPackage() + '.' + classFile.getName().substring(0, classFile.getName().length() - 6);
                         try {
                             Class<?> classe = Class.forName(className);
                             if (classe.isAnnotationPresent(Controller.class)) {
-                                controller.add(classe.getSimpleName());
+                                this.getController().add(classe.getSimpleName());
 
                                 Method[] methods = classe.getMethods();
                                 for (Method item : methods) {
@@ -314,12 +358,13 @@ public class FrontController extends HttpServlet {
                                         VerbMethod vm = new VerbMethod(item.getName(),verb);
 
                                         // HashMap.associer(annotation.value, mapping)
-                                        if (!urlMapping.containsKey(urlValue)){
+                                        if (!this.getUrlMapping().containsKey(urlValue)){
                                             mapping.addVerbMethod(vm);
-                                            urlMapping.put(urlValue, mapping);
+                                            this.getUrlMapping().put(urlValue, mapping);
                                         } else {
-                                            Mapping map = urlMapping.get(urlValue);
+                                            Mapping map = this.getUrlMapping().get(urlValue);
                                             if (map.contains(vm)) {
+                                                this.setStatusCode("500");
                                                 throw new Exception("L'url \""+urlValue+"\" apparaît plusieurs fois dans vos controlleur, avec le meme verb "+ verb );
                                             }
                                             map.addVerbMethod(vm);
@@ -331,12 +376,14 @@ public class FrontController extends HttpServlet {
                             throw e;
                         }
                     }
-                    if (controller.size()==0) {
+                    if (this.getController().size()==0) {
+                        this.setStatusCode("500");
                         throw new Exception("Il n'y aucun controller dans ce package");
                     }
                 }
             } else {
-                throw new Exception("Le package "+ controllerPackage +" n'existe pas");
+                this.setStatusCode("500");
+                throw new Exception("Le package "+ this.getControllerPackage() +" n'existe pas");
             }
         } catch (Exception e) {
             throw e;
@@ -353,6 +400,8 @@ public class FrontController extends HttpServlet {
     protected void doPost(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
         processRequest(request, response);
     }
+
+
 
 }
 

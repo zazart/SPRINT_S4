@@ -27,7 +27,7 @@ public class Mapping {
     public boolean contains(VerbMethod verbMethod) {
         boolean retour = false;
         for (VerbMethod vm : this.listVerbMethod) {
-            if (vm.getMethodName().equals(verbMethod.getMethodName()) && vm.getVerb().equals(verbMethod.getVerb())) {
+            if (vm.getVerb().equals(verbMethod.getVerb())) {
                 retour = true;
             }
         }
