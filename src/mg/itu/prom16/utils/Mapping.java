@@ -1,35 +1,45 @@
 package mg.itu.prom16.utils;
 
+import mg.itu.prom16.models.VerbMethod;
+import java.util.*;
+
 public class Mapping {
     String className;
-    String methodName;
-    String verb; 
+    List<VerbMethod> listVerbMethod = new ArrayList<>() ;
 
-    public Mapping(String className, String methodName) {
-        this.className = className;
-        this.methodName = methodName;
-    }
     
+    public Mapping(String className) {
+        this.className = className;
+    }
+
     public void setClassName(String className) {
         this.className = className;
-    }
-    public void setMethodName(String methodName) {
-        this.methodName = methodName;
     }
 
     public String getClassName() {
         return className;
     }
-    public String getMethodName() {
-        return methodName;
+
+    public void addVerbMethod(VerbMethod verbMethod) {
+        this.listVerbMethod.add(verbMethod);
     }
 
-    public String getVerb() {
-        return verb;
+    public boolean contains(VerbMethod verbMethod) {
+        boolean retour = false;
+        for (VerbMethod vm : this.listVerbMethod) {
+            if (vm.getMethodName().equals(verbMethod.getMethodName()) && vm.getVerb().equals(verbMethod.getVerb())) {
+                retour = true;
+            }
+        }
+        return retour;
     }
 
-    public void setVerb(String verb) {
-        this.verb = verb;
+    public List<VerbMethod> getListVerbMethod() {
+        return listVerbMethod;
+    }
+
+    public void setListVerbMethod(List<VerbMethod> listVerbMethod) {
+        this.listVerbMethod = listVerbMethod;
     }
 
 }

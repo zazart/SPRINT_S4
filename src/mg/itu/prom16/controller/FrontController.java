@@ -2,6 +2,7 @@ package mg.itu.prom16.controller;
 
 import mg.itu.prom16.annotation.*;
 import mg.itu.prom16.models.ModelView;
+import mg.itu.prom16.models.VerbMethod;
 import mg.itu.prom16.utils.*;
 
 import java.io.*;
@@ -74,12 +75,21 @@ public class FrontController extends HttpServlet {
 
         if (urlMapping.containsKey(map)) {
             Mapping mapping = urlMapping.get(map);
+            String verb = request.getMethod();
+            int idverb = 0;
+            for (int i=0; i < mapping.getListVerbMethod().size(); i++) {
+                if (mapping.getListVerbMethod().get(i).getVerb().equals(verb)) {
+                    idverb = i;
+                }
+            } 
         
-            if (!request.getMethod().equals(mapping.getVerb())) {
-                throw new Exception("Le verb au niveau de la method ne correspond pas au method de la requete");
-            }
-
             try {
+                String methodVerb = mapping.getListVerbMethod().get(idverb).getVerb();
+                String methodName = mapping.getListVerbMethod().get(idverb).getMethodName();
+                if (!verb.equals(methodVerb)) {
+                    throw new Exception("Le verb "+methodVerb+" au niveau de la methode ne correspond pas au method de la requete : "+verb );
+                }
+
                 Class<?> classe = Class.forName(mapping.getClassName());
                 Object classInstance = classe.getDeclaredConstructor().newInstance();
 
@@ -96,7 +106,7 @@ public class FrontController extends HttpServlet {
                 Boolean paramExist = false;
                 Method[] methods = classInstance.getClass().getDeclaredMethods();
                 for (Method item : methods) {
-                    if (item.getName().equals(mapping.getMethodName())) {
+                    if (item.getName().equals(methodName)) {
                         paramExist = item.getParameterCount() > 0;
                     }
                 }
@@ -104,7 +114,7 @@ public class FrontController extends HttpServlet {
                 // listeParam as parameters of the method
                     Parameter[] listeParam = null;                    
                     for (Method item : methods) {
-                        if (item.getName().equals(mapping.getMethodName())) {
+                        if (item.getName().equals(methodName)) {
                             listeParam = item.getParameters();
                             break;
                         }
@@ -191,11 +201,11 @@ public class FrontController extends HttpServlet {
                             parameterTypes[i] = values[i].getClass();
                         }
                     }
-                    Method method = classe.getDeclaredMethod(mapping.getMethodName(), parameterTypes);
+                    Method method = classe.getDeclaredMethod(methodName, parameterTypes);
                     Object result = method.invoke(classInstance,values);
                     retour += resultHandler(result, request, response, method);
                 } else {
-                    Method method = classe.getMethod(mapping.getMethodName());
+                    Method method = classe.getMethod(methodName);
                     Object result = method.invoke(classInstance);
                     retour += resultHandler(result, request, response, method);
                 }
@@ -291,22 +301,28 @@ public class FrontController extends HttpServlet {
                                 for (Method item : methods) {
                                     if (item.isAnnotationPresent(Url.class)) {
                                         // Mapping(controller.name, method.name)
-                                        Mapping mapping = new Mapping(className, item.getName());
+                                        Mapping mapping = new Mapping(className);
+                                        String verb = "GET";
 
                                         if (item.isAnnotationPresent(Post.class)){
-                                            mapping.setVerb("POST");
-                                        } else {
-                                            mapping.setVerb("GET");
+                                            verb = "POST";
                                         }
 
                                         Url url = item.getAnnotation(Url.class);
                                         String urlValue = url.value();
 
+                                        VerbMethod vm = new VerbMethod(item.getName(),verb);
+
                                         // HashMap.associer(annotation.value, mapping)
                                         if (!urlMapping.containsKey(urlValue)){
+                                            mapping.addVerbMethod(vm);
                                             urlMapping.put(urlValue, mapping);
                                         } else {
-                                            throw new Exception("L'url \""+urlValue+"\" apparaît plusieurs fois dans les controlleurs.");
+                                            Mapping map = urlMapping.get(urlValue);
+                                            if (map.contains(vm)) {
+                                                throw new Exception("L'url \""+urlValue+"\" apparaît plusieurs fois dans vos controlleur, avec le meme verb "+ verb );
+                                            }
+                                            map.addVerbMethod(vm);
                                         }
                                     }
                                 }
