@@ -164,7 +164,7 @@ public class FrontController extends HttpServlet {
                     // formParameterNames as parameters of the request 
                     Enumeration<String> formParameterNames = request.getParameterNames();
                     for (int i = 0; i < values.length; i++) {
-                        // Begin change
+                        
                         String paramName = listeParam[i].getName();
                         if (listeParam[i].isAnnotationPresent(Param.class)) {
                             paramName = listeParam[i].getAnnotation(Param.class).value();
@@ -199,10 +199,11 @@ public class FrontController extends HttpServlet {
                                     }
                                 }
                             }
+
                             obj = process(obj, valuesObject);
                             values[i] = obj;
-                        }
-                        else if (listeParam[i].getType().equals(CustomSession.class)) {
+                            // return "eto aloha "+ obj.getClass().getName();
+                        } else if (listeParam[i].getType().equals(CustomSession.class)) {
                             CustomSession session = new CustomSession();
                             session.setMySession(request.getSession());
                             values[i] = session;
@@ -222,6 +223,7 @@ public class FrontController extends HttpServlet {
                             }
                         }
                     }
+
                     Class<?>[] parameterTypes;
                     parameterTypes = new Class<?>[values.length];
                     for (int i = 0; i < values.length; i++) {
@@ -264,20 +266,24 @@ public class FrontController extends HttpServlet {
 
 
 
-    public static <T> T  process(T obj, Object[] valueObjects) throws Exception {
+    public <T> T  process(T obj, Object[] valueObjects) throws Exception {
         Class<?> classe = obj.getClass();
         Field[] fields = classe.getDeclaredFields();
-
-
-        for (int i = 0; i < fields.length; i++) {
-            Field field = fields[i];
-            field.setAccessible(true);
-            Object valeur = valueObjects[i];
-            if(valeur != null){
-                field.set(obj, valeur);
-            } else {
-                field.set(obj, null);
+        
+        try {
+            for (int i = 0; i < fields.length; i++) {
+                Field field = fields[i];
+                field.setAccessible(true);
+                Object valeur = valueObjects[i];
+                if(valeur != null){
+                    field.set(obj, valeur);
+                } else {
+                    field.set(obj, null);
+                }
             }
+        } catch (Exception e) {
+            this.setStatusCode(4321);
+            throw e;
         }
         return obj;
     }
