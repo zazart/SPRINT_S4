@@ -27,13 +27,13 @@ public class FrontController extends HttpServlet {
     private String controllerPackage;
     private HashMap <String,Mapping> urlMapping = new HashMap<>() ;
     private Exception exception = new Exception("");
-    private String statusCode = "200";
+    private int statusCode = 200;
     
-    public void setStatusCode(String statusCode) {
+    public void setStatusCode(int statusCode) {
         this.statusCode = statusCode;
     }
 
-    public String getStatusCode() {
+    public int getStatusCode() {
         return statusCode;
     }
 
@@ -92,13 +92,13 @@ public class FrontController extends HttpServlet {
         PrintWriter out = response.getWriter();
 
         if (this.getException().getMessage()!=""){ 
-            response.sendError(Integer.parseInt(this.getStatusCode()), this.getException().getMessage());
+            response.sendError(this.getStatusCode(), this.getException().getMessage());
         } else {
             try {
                 String reponse = this.subProcess(request, response);
                 out.println(reponse);
             } catch (Exception e) {
-                response.sendError(Integer.parseInt(this.getStatusCode()), e.getMessage());
+                response.sendError(this.getStatusCode(), e.getMessage());
             }
         }
         out.close();
@@ -128,7 +128,7 @@ public class FrontController extends HttpServlet {
                 String methodVerb = mapping.getListVerbMethod().get(idverb).getVerb();
                 String methodName = mapping.getListVerbMethod().get(idverb).getMethodName();
                 if (!verb.equals(methodVerb)) {
-                    this.setStatusCode("500");
+                    this.setStatusCode(500);
                     throw new Exception("Le verb "+methodVerb+" au niveau de la methode ne correspond pas au method de la requete : "+verb );
                 }
 
@@ -153,7 +153,6 @@ public class FrontController extends HttpServlet {
                     }
                 }
                 if (paramExist) {
-                // listeParam as parameters of the method
                     Parameter[] listeParam = null;                    
                     for (Method item : methods) {
                         if (item.getName().equals(methodName)) {
@@ -171,14 +170,15 @@ public class FrontController extends HttpServlet {
                             paramName = listeParam[i].getAnnotation(Param.class).value();
                         } else if (!listeParam[i].getType().equals(CustomSession.class)){
                             String errorMess = "vous n'avez pas annoté le paramètre '"+paramName+"' par @Param(\"...\")"  ;
-                            this.setStatusCode("500");
+                            this.setStatusCode(500);
                             throw new Exception("<p>ETU-002415 : "+errorMess+"</p>");
                         }
+                        
                         
                         if (!listeParam[i].getClass().isPrimitive() && listeParam[i].getType().isAnnotationPresent(Objet.class)) {
                             Class<?> clazz = Class.forName(listeParam[i].getParameterizedType().getTypeName());
                             Object obj = clazz.getDeclaredConstructor().newInstance();
-
+                            
                             Field[] fields = obj.getClass().getDeclaredFields();
                             Object[] valuesObject = new Object[fields.length];
                             while (formParameterNames.hasMoreElements()) {
@@ -221,7 +221,6 @@ public class FrontController extends HttpServlet {
                                 values[i] = null;
                             }
                         }
-                        // End change
                     }
                     Class<?>[] parameterTypes;
                     parameterTypes = new Class<?>[values.length];
@@ -257,7 +256,7 @@ public class FrontController extends HttpServlet {
                 throw e;
             }
         } else {
-            this.setStatusCode("404");
+            this.setStatusCode(404);
             throw new Exception("<p>Il n'y a pas de méthode associée à ce chemin \""+requestURL+"\"</p>");
         }    
         return retour;
@@ -268,6 +267,7 @@ public class FrontController extends HttpServlet {
     public static <T> T  process(T obj, Object[] valueObjects) throws Exception {
         Class<?> classe = obj.getClass();
         Field[] fields = classe.getDeclaredFields();
+
 
         for (int i = 0; i < fields.length; i++) {
             Field field = fields[i];
@@ -364,7 +364,7 @@ public class FrontController extends HttpServlet {
                                         } else {
                                             Mapping map = this.getUrlMapping().get(urlValue);
                                             if (map.contains(vm)) {
-                                                this.setStatusCode("500");
+                                                this.setStatusCode(500);
                                                 throw new Exception("L'url \""+urlValue+"\" apparaît plusieurs fois dans vos controlleur, avec le meme verb "+ verb );
                                             }
                                             map.addVerbMethod(vm);
@@ -377,12 +377,12 @@ public class FrontController extends HttpServlet {
                         }
                     }
                     if (this.getController().size()==0) {
-                        this.setStatusCode("500");
+                        this.setStatusCode(500);
                         throw new Exception("Il n'y aucun controller dans ce package");
                     }
                 }
             } else {
-                this.setStatusCode("500");
+                this.setStatusCode(500);
                 throw new Exception("Le package "+ this.getControllerPackage() +" n'existe pas");
             }
         } catch (Exception e) {
