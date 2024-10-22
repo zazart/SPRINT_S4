@@ -201,34 +201,12 @@ public class FrontController extends HttpServlet {
                                             String paramSimpleName = name.substring(indexSuite);
 
                                             if (fields[j].isAnnotationPresent(AttribObjet.class)){
-                                                
                                                 if (paramSimpleName.equals(fields[j].getAnnotation(AttribObjet.class).value())){
-                                                    // this.checkValuesObject(listeParam[i], request, fields[j] , valuesObject[i], name);
-                                                    if (paramSimpleName.equals(fields[j].getName())){
-                                                        if (listeParam[i].getType() == Part.class) {
-                                                            try {
-                                                                String namePart = listeParam[i].getAnnotation(Param.class).value();
-                                                                valuesObject[i] = request.getPart(namePart);
-                                                            } catch (Exception e) {
-                                                                return "Erreur lors de la récupération du fichier :"+e.getMessage();
-                                                            }
-                                                        } else {
-                                                            valuesObject[j] = TypeHandler.castParameter(request.getParameter(name), fields[j].getType().getName());
-                                                        }
-                                                    }  
+                                                    valuesObject[j] = TypeHandler.castParameter(request.getParameter(name), fields[j].getType().getName());
                                                 } 
                                             } else {
                                                 if (paramSimpleName.equals(fields[j].getName())){
-                                                    if (listeParam[i].getType() == Part.class) {
-                                                        try {
-                                                            String namePart = listeParam[i].getAnnotation(Param.class).value();
-                                                            valuesObject[i] = request.getPart(namePart);
-                                                        } catch (Exception e) {
-                                                            return "Erreur lors de la récupération du fichier :"+e.getMessage();
-                                                        }
-                                                    } else {
-                                                        valuesObject[j] = TypeHandler.castParameter(request.getParameter(name), fields[j].getType().getName());
-                                                    }
+                                                    valuesObject[j] = TypeHandler.castParameter(request.getParameter(name), fields[j].getType().getName());
                                                 }  
                                             }
                                         
@@ -283,20 +261,6 @@ public class FrontController extends HttpServlet {
         return retour;
     }
 
-
-
-    public void checkValuesObject(Parameter parameter,HttpServletRequest request, Field field ,Object valueObject, String name) throws Exception {
-        if (parameter.getType() == Part.class) {
-            try {
-                String namePart = parameter.getAnnotation(Param.class).value();
-                valueObject = request.getPart(namePart);
-            } catch (Exception e) {
-                throw new Exception("Erreur lors de la récupération du fichier :"+e.getMessage());
-            }
-        } else {
-            valueObject = TypeHandler.castParameter(request.getParameter(name), field.getType().getName());
-        }
-    }
 
 
     public <T> T  process(T obj, Object[] valueObjects) throws Exception {
