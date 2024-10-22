@@ -19,9 +19,13 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import jakarta.servlet.http.Part;
 import jakarta.servlet.RequestDispatcher;
 
+import jakarta.servlet.annotation.MultipartConfig;
 
+
+@MultipartConfig
 public class FrontController extends HttpServlet {
     private List<String> controller = new ArrayList<>();
     private String controllerPackage;
@@ -123,6 +127,7 @@ public class FrontController extends HttpServlet {
                     idverb = i;
                 }
             } 
+
         
             try {
                 String methodVerb = mapping.getListVerbMethod().get(idverb).getVerb();
@@ -174,77 +179,91 @@ public class FrontController extends HttpServlet {
                             throw new Exception("<p>ETU-002415 : "+errorMess+"</p>");
                         }
                         
-                        
-                        if (!listeParam[i].getClass().isPrimitive() && listeParam[i].getType().isAnnotationPresent(Objet.class)) {
-                            Class<?> clazz = Class.forName(listeParam[i].getParameterizedType().getTypeName());
-                            Object obj = clazz.getDeclaredConstructor().newInstance();
-                            
-                            Field[] fields = obj.getClass().getDeclaredFields();
-                            Object[] valuesObject = new Object[fields.length];
-                            while (formParameterNames.hasMoreElements()) {
-                                String name = formParameterNames.nextElement();
-                                for (int j = 0; j < fields.length; j++) {
-                                    if (name.startsWith(paramName+".")) {
-                                        int indexSuite = (paramName + ".").length();
-                                        String paramSimpleName = name.substring(indexSuite);
-                                        if (fields[j].isAnnotationPresent(AttribObjet.class)){
-                                            if (paramSimpleName.equals(fields[j].getAnnotation(AttribObjet.class).value())){
-                                                valuesObject[j] = CastTo.castParameter(request.getParameter(name), fields[j].getType().getName());
+                        if (listeParam[i].getType() == Part.class) {
+                            try {
+                                String name = listeParam[i].getAnnotation(Param.class).value();
+                                values[i] = request.getPart(name);
+                            } catch (Exception e) {
+                                throw new Exception("Erreur lors de la récupération du fichier :"+e.getMessage());
+                            }
+                        } else {
+                            if (!listeParam[i].getClass().isPrimitive() && listeParam[i].getType().isAnnotationPresent(Objet.class)) {
+                                Class<?> clazz = Class.forName(listeParam[i].getParameterizedType().getTypeName());
+                                Object obj = clazz.getDeclaredConstructor().newInstance();
+
+                                Field[] fields = obj.getClass().getDeclaredFields();
+                                Object[] valuesObject = new Object[fields.length];
+                                while (formParameterNames.hasMoreElements()) {
+                                    String name = formParameterNames.nextElement();
+                                    for (int j = 0; j < fields.length; j++) {
+                                        if (name.startsWith(paramName+".")) {
+                                            int indexSuite = (paramName + ".").length();
+                                            String paramSimpleName = name.substring(indexSuite);
+
+                                            if (fields[j].isAnnotationPresent(AttribObjet.class)){
+                                                
+                                                if (paramSimpleName.equals(fields[j].getAnnotation(AttribObjet.class).value())){
+                                                    // this.checkValuesObject(listeParam[i], request, fields[j] , valuesObject[i], name);
+                                                    if (paramSimpleName.equals(fields[j].getName())){
+                                                        if (listeParam[i].getType() == Part.class) {
+                                                            try {
+                                                                String namePart = listeParam[i].getAnnotation(Param.class).value();
+                                                                valuesObject[i] = request.getPart(namePart);
+                                                            } catch (Exception e) {
+                                                                return "Erreur lors de la récupération du fichier :"+e.getMessage();
+                                                            }
+                                                        } else {
+                                                            valuesObject[j] = TypeHandler.castParameter(request.getParameter(name), fields[j].getType().getName());
+                                                        }
+                                                    }  
+                                                } 
+                                            } else {
+                                                if (paramSimpleName.equals(fields[j].getName())){
+                                                    if (listeParam[i].getType() == Part.class) {
+                                                        try {
+                                                            String namePart = listeParam[i].getAnnotation(Param.class).value();
+                                                            valuesObject[i] = request.getPart(namePart);
+                                                        } catch (Exception e) {
+                                                            return "Erreur lors de la récupération du fichier :"+e.getMessage();
+                                                        }
+                                                    } else {
+                                                        valuesObject[j] = TypeHandler.castParameter(request.getParameter(name), fields[j].getType().getName());
+                                                    }
+                                                }  
                                             }
-                                        } else {
-                                            if (paramSimpleName.equals(fields[j].getName())){
-                                                valuesObject[j] = CastTo.castParameter(request.getParameter(name), fields[j].getType().getName());
-                                            } 
+                                        
                                         }
                                     }
                                 }
-                            }
 
-                            obj = process(obj, valuesObject);
-                            values[i] = obj;
-                            // return "eto aloha "+ obj.getClass().getName();
-                        } else if (listeParam[i].getType().equals(CustomSession.class)) {
-                            CustomSession session = new CustomSession();
-                            session.setMySession(request.getSession());
-                            values[i] = session;
-                        }
-                        else {
-                            boolean isNull = true;
-                            while (formParameterNames.hasMoreElements()) {
-                                String name = formParameterNames.nextElement();
-                                if (name.equals(paramName)) {
-                                    values[i] =CastTo.castParameter(request.getParameter(name), listeParam[i].getParameterizedType().getTypeName());
-                                    isNull = false;
-                                    break;
+                                obj = process(obj, valuesObject);
+                                values[i] = obj;
+                            } else if (listeParam[i].getType().equals(CustomSession.class)) {
+                                CustomSession session = new CustomSession(); 
+                                session.setMySession(request.getSession());
+                                values[i] = session;
+                            }
+                            else {
+                                boolean isNull = true;
+                                while (formParameterNames.hasMoreElements()) {
+                                    String name = formParameterNames.nextElement();
+                                    if (name.equals(paramName)) {
+                                        values[i] =TypeHandler.castParameter(request.getParameter(name), listeParam[i].getParameterizedType().getTypeName());
+                                        isNull = false;
+                                        break;
+                                    }
+                                }
+                                if (isNull) {
+                                    values[i] = null;
                                 }
                             }
-                            if (isNull) {
-                                values[i] = null;
-                            }
                         }
-                    }
 
-                    Class<?>[] parameterTypes;
-                    parameterTypes = new Class<?>[values.length];
-                    for (int i = 0; i < values.length; i++) {
-                        if (values[i] instanceof Integer) {
-                            parameterTypes[i] = int.class;
-                        } else if (values[i] instanceof Double) {
-                            parameterTypes[i] = double.class;
-                        } else if (values[i] instanceof Boolean) {
-                            parameterTypes[i] = boolean.class;
-                        } else if (values[i] instanceof Long) {
-                            parameterTypes[i] = long.class;
-                        } else if (values[i] instanceof Float) {
-                            parameterTypes[i] = float.class;
-                        } else if (values[i] instanceof Short) {
-                            parameterTypes[i] = short.class;
-                        } else if (values[i] instanceof Byte) {
-                            parameterTypes[i] = byte.class;
-                        } else {
-                            parameterTypes[i] = values[i].getClass();
-                        }
+                    
                     }
+                    
+                    Class<?>[] parameterTypes = TypeHandler.checkParameterTypes(values);
+
                     Method method = classe.getDeclaredMethod(methodName, parameterTypes);
                     Object result = method.invoke(classInstance,values);
                     retour += resultHandler(result, request, response, method);
@@ -255,7 +274,7 @@ public class FrontController extends HttpServlet {
                 }
             
             } catch (Exception e){
-                throw e;
+                throw new Exception(e.getMessage());
             }
         } else {
             this.setStatusCode(404);
@@ -264,6 +283,20 @@ public class FrontController extends HttpServlet {
         return retour;
     }
 
+
+
+    public void checkValuesObject(Parameter parameter,HttpServletRequest request, Field field ,Object valueObject, String name) throws Exception {
+        if (parameter.getType() == Part.class) {
+            try {
+                String namePart = parameter.getAnnotation(Param.class).value();
+                valueObject = request.getPart(namePart);
+            } catch (Exception e) {
+                throw new Exception("Erreur lors de la récupération du fichier :"+e.getMessage());
+            }
+        } else {
+            valueObject = TypeHandler.castParameter(request.getParameter(name), field.getType().getName());
+        }
+    }
 
 
     public <T> T  process(T obj, Object[] valueObjects) throws Exception {
