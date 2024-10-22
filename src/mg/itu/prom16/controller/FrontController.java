@@ -19,21 +19,25 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import jakarta.servlet.http.Part;
 import jakarta.servlet.RequestDispatcher;
 
+import jakarta.servlet.annotation.MultipartConfig;
 
+
+@MultipartConfig
 public class FrontController extends HttpServlet {
     private List<String> controller = new ArrayList<>();
     private String controllerPackage;
     private HashMap <String,Mapping> urlMapping = new HashMap<>() ;
     private Exception exception = new Exception("");
-    private String statusCode = "200";
+    private int statusCode = 200;
     
-    public void setStatusCode(String statusCode) {
+    public void setStatusCode(int statusCode) {
         this.statusCode = statusCode;
     }
 
-    public String getStatusCode() {
+    public int getStatusCode() {
         return statusCode;
     }
 
@@ -92,13 +96,13 @@ public class FrontController extends HttpServlet {
         PrintWriter out = response.getWriter();
 
         if (this.getException().getMessage()!=""){ 
-            response.sendError(Integer.parseInt(this.getStatusCode()), this.getException().getMessage());
+            response.sendError(this.getStatusCode(), this.getException().getMessage());
         } else {
             try {
                 String reponse = this.subProcess(request, response);
                 out.println(reponse);
             } catch (Exception e) {
-                response.sendError(Integer.parseInt(this.getStatusCode()), e.getMessage());
+                response.sendError(this.getStatusCode(), e.getMessage());
             }
         }
         out.close();
@@ -123,12 +127,13 @@ public class FrontController extends HttpServlet {
                     idverb = i;
                 }
             } 
+
         
             try {
                 String methodVerb = mapping.getListVerbMethod().get(idverb).getVerb();
                 String methodName = mapping.getListVerbMethod().get(idverb).getMethodName();
                 if (!verb.equals(methodVerb)) {
-                    this.setStatusCode("500");
+                    this.setStatusCode(500);
                     throw new Exception("Le verb "+methodVerb+" au niveau de la methode ne correspond pas au method de la requete : "+verb );
                 }
 
@@ -153,7 +158,6 @@ public class FrontController extends HttpServlet {
                     }
                 }
                 if (paramExist) {
-                // listeParam as parameters of the method
                     Parameter[] listeParam = null;                    
                     for (Method item : methods) {
                         if (item.getName().equals(methodName)) {
@@ -165,85 +169,79 @@ public class FrontController extends HttpServlet {
                     // formParameterNames as parameters of the request 
                     Enumeration<String> formParameterNames = request.getParameterNames();
                     for (int i = 0; i < values.length; i++) {
-                        // Begin change
+                        
                         String paramName = listeParam[i].getName();
                         if (listeParam[i].isAnnotationPresent(Param.class)) {
                             paramName = listeParam[i].getAnnotation(Param.class).value();
                         } else if (!listeParam[i].getType().equals(CustomSession.class)){
                             String errorMess = "vous n'avez pas annoté le paramètre '"+paramName+"' par @Param(\"...\")"  ;
-                            this.setStatusCode("500");
+                            this.setStatusCode(500);
                             throw new Exception("<p>ETU-002415 : "+errorMess+"</p>");
                         }
                         
-                        if (!listeParam[i].getClass().isPrimitive() && listeParam[i].getType().isAnnotationPresent(Objet.class)) {
-                            Class<?> clazz = Class.forName(listeParam[i].getParameterizedType().getTypeName());
-                            Object obj = clazz.getDeclaredConstructor().newInstance();
+                        if (listeParam[i].getType() == Part.class) {
+                            try {
+                                String name = listeParam[i].getAnnotation(Param.class).value();
+                                values[i] = request.getPart(name);
+                            } catch (Exception e) {
+                                throw new Exception("Erreur lors de la récupération du fichier :"+e.getMessage());
+                            }
+                        } else {
+                            if (!listeParam[i].getClass().isPrimitive() && listeParam[i].getType().isAnnotationPresent(Objet.class)) {
+                                Class<?> clazz = Class.forName(listeParam[i].getParameterizedType().getTypeName());
+                                Object obj = clazz.getDeclaredConstructor().newInstance();
 
-                            Field[] fields = obj.getClass().getDeclaredFields();
-                            Object[] valuesObject = new Object[fields.length];
-                            while (formParameterNames.hasMoreElements()) {
-                                String name = formParameterNames.nextElement();
-                                for (int j = 0; j < fields.length; j++) {
-                                    if (name.startsWith(paramName+".")) {
-                                        int indexSuite = (paramName + ".").length();
-                                        String paramSimpleName = name.substring(indexSuite);
-                                        if (fields[j].isAnnotationPresent(AttribObjet.class)){
-                                            if (paramSimpleName.equals(fields[j].getAnnotation(AttribObjet.class).value())){
-                                                valuesObject[j] = CastTo.castParameter(request.getParameter(name), fields[j].getType().getName());
+                                Field[] fields = obj.getClass().getDeclaredFields();
+                                Object[] valuesObject = new Object[fields.length];
+                                while (formParameterNames.hasMoreElements()) {
+                                    String name = formParameterNames.nextElement();
+                                    for (int j = 0; j < fields.length; j++) {
+                                        if (name.startsWith(paramName+".")) {
+                                            int indexSuite = (paramName + ".").length();
+                                            String paramSimpleName = name.substring(indexSuite);
+
+                                            if (fields[j].isAnnotationPresent(AttribObjet.class)){
+                                                if (paramSimpleName.equals(fields[j].getAnnotation(AttribObjet.class).value())){
+                                                    valuesObject[j] = TypeHandler.castParameter(request.getParameter(name), fields[j].getType().getName());
+                                                } 
+                                            } else {
+                                                if (paramSimpleName.equals(fields[j].getName())){
+                                                    valuesObject[j] = TypeHandler.castParameter(request.getParameter(name), fields[j].getType().getName());
+                                                }  
                                             }
-                                        } else {
-                                            if (paramSimpleName.equals(fields[j].getName())){
-                                                valuesObject[j] = CastTo.castParameter(request.getParameter(name), fields[j].getType().getName());
-                                            } 
+                                        
                                         }
                                     }
                                 }
+
+                                obj = process(obj, valuesObject);
+                                values[i] = obj;
+                            } else if (listeParam[i].getType().equals(CustomSession.class)) {
+                                CustomSession session = new CustomSession(); 
+                                session.setMySession(request.getSession());
+                                values[i] = session;
                             }
-                            obj = process(obj, valuesObject);
-                            values[i] = obj;
-                        }
-                        else if (listeParam[i].getType().equals(CustomSession.class)) {
-                            CustomSession session = new CustomSession();
-                            session.setMySession(request.getSession());
-                            values[i] = session;
-                        }
-                        else {
-                            boolean isNull = true;
-                            while (formParameterNames.hasMoreElements()) {
-                                String name = formParameterNames.nextElement();
-                                if (name.equals(paramName)) {
-                                    values[i] =CastTo.castParameter(request.getParameter(name), listeParam[i].getParameterizedType().getTypeName());
-                                    isNull = false;
-                                    break;
+                            else {
+                                boolean isNull = true;
+                                while (formParameterNames.hasMoreElements()) {
+                                    String name = formParameterNames.nextElement();
+                                    if (name.equals(paramName)) {
+                                        values[i] =TypeHandler.castParameter(request.getParameter(name), listeParam[i].getParameterizedType().getTypeName());
+                                        isNull = false;
+                                        break;
+                                    }
+                                }
+                                if (isNull) {
+                                    values[i] = null;
                                 }
                             }
-                            if (isNull) {
-                                values[i] = null;
-                            }
                         }
-                        // End change
+
+                    
                     }
-                    Class<?>[] parameterTypes;
-                    parameterTypes = new Class<?>[values.length];
-                    for (int i = 0; i < values.length; i++) {
-                        if (values[i] instanceof Integer) {
-                            parameterTypes[i] = int.class;
-                        } else if (values[i] instanceof Double) {
-                            parameterTypes[i] = double.class;
-                        } else if (values[i] instanceof Boolean) {
-                            parameterTypes[i] = boolean.class;
-                        } else if (values[i] instanceof Long) {
-                            parameterTypes[i] = long.class;
-                        } else if (values[i] instanceof Float) {
-                            parameterTypes[i] = float.class;
-                        } else if (values[i] instanceof Short) {
-                            parameterTypes[i] = short.class;
-                        } else if (values[i] instanceof Byte) {
-                            parameterTypes[i] = byte.class;
-                        } else {
-                            parameterTypes[i] = values[i].getClass();
-                        }
-                    }
+                    
+                    Class<?>[] parameterTypes = TypeHandler.checkParameterTypes(values);
+
                     Method method = classe.getDeclaredMethod(methodName, parameterTypes);
                     Object result = method.invoke(classInstance,values);
                     retour += resultHandler(result, request, response, method);
@@ -254,10 +252,10 @@ public class FrontController extends HttpServlet {
                 }
             
             } catch (Exception e){
-                throw e;
+                throw new Exception(e.getMessage());
             }
         } else {
-            this.setStatusCode("404");
+            this.setStatusCode(404);
             throw new Exception("<p>Il n'y a pas de méthode associée à ce chemin \""+requestURL+"\"</p>");
         }    
         return retour;
@@ -265,19 +263,24 @@ public class FrontController extends HttpServlet {
 
 
 
-    public static <T> T  process(T obj, Object[] valueObjects) throws Exception {
+    public <T> T  process(T obj, Object[] valueObjects) throws Exception {
         Class<?> classe = obj.getClass();
         Field[] fields = classe.getDeclaredFields();
-
-        for (int i = 0; i < fields.length; i++) {
-            Field field = fields[i];
-            field.setAccessible(true);
-            Object valeur = valueObjects[i];
-            if(valeur != null){
-                field.set(obj, valeur);
-            } else {
-                field.set(obj, null);
+        
+        try {
+            for (int i = 0; i < fields.length; i++) {
+                Field field = fields[i];
+                field.setAccessible(true);
+                Object valeur = valueObjects[i];
+                if(valeur != null){
+                    field.set(obj, valeur);
+                } else {
+                    field.set(obj, null);
+                }
             }
+        } catch (Exception e) {
+            this.setStatusCode(4321);
+            throw e;
         }
         return obj;
     }
@@ -364,7 +367,7 @@ public class FrontController extends HttpServlet {
                                         } else {
                                             Mapping map = this.getUrlMapping().get(urlValue);
                                             if (map.contains(vm)) {
-                                                this.setStatusCode("500");
+                                                this.setStatusCode(500);
                                                 throw new Exception("L'url \""+urlValue+"\" apparaît plusieurs fois dans vos controlleur, avec le meme verb "+ verb );
                                             }
                                             map.addVerbMethod(vm);
@@ -377,12 +380,12 @@ public class FrontController extends HttpServlet {
                         }
                     }
                     if (this.getController().size()==0) {
-                        this.setStatusCode("500");
+                        this.setStatusCode(500);
                         throw new Exception("Il n'y aucun controller dans ce package");
                     }
                 }
             } else {
-                this.setStatusCode("500");
+                this.setStatusCode(500);
                 throw new Exception("Le package "+ this.getControllerPackage() +" n'existe pas");
             }
         } catch (Exception e) {

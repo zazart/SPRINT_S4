@@ -39,7 +39,7 @@ for /r "%working_dir%\src" %%f in (*.java) do copy "%%f" "%local%\out"
 echo Copie avec succes
 
 echo Compilation de toute ces fichiers
-javac -parameters -cp "%local%\lib\*" -d "%local%" "%local%\out\*.java"
+javac -parameters -cp "%local%\lib\*" -d "%local%" %local%\out\*.java
 
 jar -cf "%name%.jar" %local%\mg
 

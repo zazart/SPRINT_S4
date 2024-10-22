@@ -1,6 +1,6 @@
 package mg.itu.prom16.utils;
 
-public class CastTo {
+public class TypeHandler {
 
     public static Class<?> checkClassForName(String typeName) throws Exception {
         switch (typeName) {
@@ -57,5 +57,32 @@ public class CastTo {
         } else {
             throw new Exception("Erreur de cast sur "+type);
         }
+    }
+
+    public static Class<?>[] checkParameterTypes(Object[] values) {
+        Class<?>[] parameterTypes = new Class<?>[values.length];
+
+       for (int i = 0; i < values.length; i++) {
+           if (values[i] instanceof Integer) {
+               parameterTypes[i] = int.class;
+           } else if (values[i] instanceof Double) {
+               parameterTypes[i] = double.class;
+           } else if (values[i] instanceof Boolean) {
+               parameterTypes[i] = boolean.class;
+           } else if (values[i] instanceof Long) {
+               parameterTypes[i] = long.class;
+           } else if (values[i] instanceof Float) {
+               parameterTypes[i] = float.class;
+           } else if (values[i] instanceof Short) {
+               parameterTypes[i] = short.class;
+           } else if (values[i].getClass().getName().equals("org.apache.catalina.core.ApplicationPart")) {
+               parameterTypes[i] = jakarta.servlet.http.Part.class;
+           } else if (values[i] instanceof Byte) {
+               parameterTypes[i] = byte.class;
+           } else {
+               parameterTypes[i] = values[i].getClass();
+           }
+       }
+       return parameterTypes;
     }
 }
