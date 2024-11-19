@@ -1,11 +1,12 @@
-package mg.itu.prom16.annotation;
+package mg.itu.prom16.annotation.validation;
 
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
-@Target(ElementType.METHOD)
+@Target(ElementType.FIELD)
 @Retention(RetentionPolicy.RUNTIME)
-public @interface Get {
+public @interface Email {
+
 }

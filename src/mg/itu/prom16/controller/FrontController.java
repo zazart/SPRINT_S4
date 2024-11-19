@@ -1,6 +1,7 @@
 package mg.itu.prom16.controller;
 
 import mg.itu.prom16.annotation.*;
+import mg.itu.prom16.annotation.verb.Post;
 import mg.itu.prom16.models.ModelView;
 import mg.itu.prom16.models.VerbMethod;
 import mg.itu.prom16.utils.*;
@@ -202,14 +203,25 @@ public class FrontController extends HttpServlet {
 
                                             if (fields[j].isAnnotationPresent(AttribObjet.class)){
                                                 if (paramSimpleName.equals(fields[j].getAnnotation(AttribObjet.class).value())){
-                                                    valuesObject[j] = TypeHandler.castParameter(request.getParameter(name), fields[j].getType().getName());
+                                                    if (Validation.validation(fields[j], request.getParameter(name)) != "") {
+                                                        this.setStatusCode(401);
+                                                        throw new Exception("Erreur :"+Validation.validation(fields[j], request.getParameter(name)));
+                                                    } else {
+                                                        valuesObject[j] = TypeHandler.castParameter(request.getParameter(name), fields[j].getType().getName());
+                                                        break;
+                                                    }
                                                 } 
                                             } else {
                                                 if (paramSimpleName.equals(fields[j].getName())){
-                                                    valuesObject[j] = TypeHandler.castParameter(request.getParameter(name), fields[j].getType().getName());
+                                                    if (Validation.validation(fields[j], request.getParameter(name)) != "") {
+                                                        this.setStatusCode(401);
+                                                        throw new Exception("Erreur :"+Validation.validation(fields[j], request.getParameter(name)));
+                                                    } else {
+                                                        valuesObject[j] = TypeHandler.castParameter(request.getParameter(name), fields[j].getType().getName());
+                                                        break;
+                                                    }
                                                 }  
                                             }
-                                        
                                         }
                                     }
                                 }
@@ -407,4 +419,6 @@ public class FrontController extends HttpServlet {
 
 
 }
+
+
 
