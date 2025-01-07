@@ -5,6 +5,7 @@ import java.util.HashMap;
 public class ModelView {
     private String url;
     private HashMap<String,Object> data = new HashMap<>();
+    private String error ;
 
     public ModelView(String url) {
         this.url = url;
@@ -26,5 +27,14 @@ public class ModelView {
 
     public void addObject(String key, Object objet) {
         data.put(key, objet);
+    }
+
+
+    public String getError() {
+        return error;
+    }
+
+    public void setError(String error) {
+        this.error = error;
     }
 }

@@ -1,6 +1,7 @@
 package mg.itu.prom16.controller;
 
 import mg.itu.prom16.annotation.*;
+import mg.itu.prom16.annotation.verb.Get;
 import mg.itu.prom16.annotation.verb.Post;
 import mg.itu.prom16.models.ModelView;
 import mg.itu.prom16.models.VerbMethod;
@@ -9,6 +10,7 @@ import mg.itu.prom16.utils.*;
 import java.io.*;
 import java.net.URLDecoder;
 import java.util.*;
+import java.net.URL;
 
 import com.google.gson.Gson;
 
@@ -95,6 +97,7 @@ public class FrontController extends HttpServlet {
 
     protected void processRequest(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
         PrintWriter out = response.getWriter();
+        
 
         if (this.getException().getMessage()!=""){ 
             response.sendError(this.getStatusCode(), this.getException().getMessage());
@@ -103,7 +106,11 @@ public class FrontController extends HttpServlet {
                 String reponse = this.subProcess(request, response);
                 out.println(reponse);
             } catch (Exception e) {
-                response.sendError(this.getStatusCode(), e.getMessage());
+                // if (!response.isCommitted()) {
+                    response.sendError(this.getStatusCode(), e.getMessage());
+                // } else {
+                //     out.println(e.getMessage());
+                // }
             }
         }
         out.close();
@@ -117,6 +124,8 @@ public class FrontController extends HttpServlet {
         String[] requestUrlSplitted = requestURL.toString().split("/");
         String map = requestUrlSplitted[requestUrlSplitted.length-1];
         String retour = "";
+        int errorForm = 0;
+
         if (requestUrlSplitted.length <=4 ) {map = "/" ;}
 
         if (this.getUrlMapping().containsKey(map)) {
@@ -133,6 +142,10 @@ public class FrontController extends HttpServlet {
             try {
                 String methodVerb = mapping.getListVerbMethod().get(idverb).getVerb();
                 String methodName = mapping.getListVerbMethod().get(idverb).getMethodName();
+                if (request.getAttribute("error")!=null) {
+                    verb = "GET";
+                }
+
                 if (!verb.equals(methodVerb)) {
                     this.setStatusCode(500);
                     throw new Exception("Le verb "+methodVerb+" au niveau de la methode ne correspond pas au method de la requete : "+verb );
@@ -200,12 +213,15 @@ public class FrontController extends HttpServlet {
                                         if (name.startsWith(paramName+".")) {
                                             int indexSuite = (paramName + ".").length();
                                             String paramSimpleName = name.substring(indexSuite);
+                                            request.setAttribute(name, request.getParameter(name));
 
                                             if (fields[j].isAnnotationPresent(AttribObjet.class)){
                                                 if (paramSimpleName.equals(fields[j].getAnnotation(AttribObjet.class).value())){
                                                     if (Validation.validation(fields[j], request.getParameter(name)) != "") {
                                                         this.setStatusCode(401);
-                                                        throw new Exception("Erreur :"+Validation.validation(fields[j], request.getParameter(name)));
+                                                        String error = Validation.validation(fields[j], request.getParameter(name));
+                                                        request.setAttribute("error_"+name, error);
+                                                        errorForm ++;
                                                     } else {
                                                         valuesObject[j] = TypeHandler.castParameter(request.getParameter(name), fields[j].getType().getName());
                                                         break;
@@ -214,8 +230,9 @@ public class FrontController extends HttpServlet {
                                             } else {
                                                 if (paramSimpleName.equals(fields[j].getName())){
                                                     if (Validation.validation(fields[j], request.getParameter(name)) != "") {
-                                                        this.setStatusCode(401);
-                                                        throw new Exception("Erreur :"+Validation.validation(fields[j], request.getParameter(name)));
+                                                        String error = Validation.validation(fields[j], request.getParameter(name));
+                                                        request.setAttribute("error_"+name, error);
+                                                        errorForm ++;
                                                     } else {
                                                         valuesObject[j] = TypeHandler.castParameter(request.getParameter(name), fields[j].getType().getName());
                                                         break;
@@ -256,11 +273,11 @@ public class FrontController extends HttpServlet {
 
                     Method method = classe.getDeclaredMethod(methodName, parameterTypes);
                     Object result = method.invoke(classInstance,values);
-                    retour += resultHandler(result, request, response, method);
+                    retour += resultHandler(result, request, response, method, errorForm);
                 } else {
                     Method method = classe.getMethod(methodName);
                     Object result = method.invoke(classInstance);
-                    retour += resultHandler(result, request, response, method);
+                    retour += resultHandler(result, request, response, method, errorForm);
                 }
             
             } catch (Exception e){
@@ -300,9 +317,22 @@ public class FrontController extends HttpServlet {
 
 
 
-    public static String resultHandler(Object result, HttpServletRequest request, HttpServletResponse response, Method method) throws Exception {
+    public String resultHandler(Object result, HttpServletRequest request, HttpServletResponse response, Method method, int errorForm) throws Exception {
         String retour = "";
         Gson gson = new Gson();
+
+        if (errorForm > 0) {
+            request.setAttribute("error", "value");
+         
+            ModelView mv = (ModelView) result;
+            String referer = mv.getError();
+            
+            RequestDispatcher dispatcher = request.getRequestDispatcher(referer);
+            dispatcher.forward(request, response);
+            return "";
+        }
+
+
         if (result instanceof ModelView){
             ModelView mv = (ModelView) result;
             RequestDispatcher dispatch = request.getRequestDispatcher(mv.getUrl());
