@@ -127,27 +127,15 @@ public class FrontController extends HttpServlet {
         String map = requestUrlSplitted[requestUrlSplitted.length-1];
         String retour = "";
         AtomicBoolean isErrorForm = new AtomicBoolean(false);
-
         if (requestUrlSplitted.length <=4 ) {map = "/" ;}
 
         if (this.getUrlMapping().containsKey(map)) {
             Mapping mapping = this.getUrlMapping().get(map);
-            
             try {
                 String methodName = checkVerbMethod(request, mapping);
-
                 Class<?> classe = Class.forName(mapping.getClassName());
                 Object classInstance = classe.getDeclaredConstructor().newInstance();
-
-                Field[] attributs = classInstance.getClass().getDeclaredFields();
-                for (Field item : attributs) {
-                    if (item.getType().equals(CustomSession.class)) {
-                        item.setAccessible(true);
-                        CustomSession session = new CustomSession();
-                        session.setMySession(request.getSession());
-                        item.set(classInstance, session);
-                    }
-                }
+                checkCustomSession(request, classInstance);  // Check CustomSession
 
                 Boolean paramExist = false;
                 Method[] methods = classInstance.getClass().getDeclaredMethods();
@@ -156,11 +144,9 @@ public class FrontController extends HttpServlet {
                         paramExist = item.getParameterCount() > 0;
                     }
                 }
-
                 if (paramExist) {
                     Object[] values = getValuesIfParamExist(request, methods, methodName, isErrorForm);
                     Class<?>[] parameterTypes = TypeHandler.checkParameterTypes(values);
-
                     Method method = classe.getDeclaredMethod(methodName, parameterTypes);
                     Object result = method.invoke(classInstance,values);
                     retour += resultHandler(result, request, response, method, isErrorForm);
@@ -178,6 +164,19 @@ public class FrontController extends HttpServlet {
             throw new Exception("<p>Il n'y a pas de méthode associée à ce chemin \""+requestURL+"\"</p>");
         }    
         return retour;
+    }
+
+    public void checkCustomSession(HttpServletRequest request, Object classInstance) throws Exception{
+        Field[] attributs = classInstance.getClass().getDeclaredFields();
+        for (Field item : attributs) {
+            if (item.getType().equals(CustomSession.class)) {
+                item.setAccessible(true);
+                CustomSession session = new CustomSession();
+                session.setMySession(request.getSession());
+                item.set(classInstance, session);
+            }
+        }
+
     }
 
     public String checkVerbMethod(HttpServletRequest request, Mapping mapping) throws Exception{
@@ -204,23 +203,13 @@ public class FrontController extends HttpServlet {
         Parameter[] listeParam = null;                    
         for (Method item : methods) {
             if (item.getName().equals(methodName)) {
-                listeParam = item.getParameters();
-                break;
+                listeParam = item.getParameters(); break;
             }
         }
         Object[] values = new Object[listeParam.length];
-        // formParameterNames as parameters of the request 
-        Enumeration<String> formParameterNames = request.getParameterNames();
+        Enumeration<String> formParamNames = request.getParameterNames(); // formParamNames as parameters of the request 
         for (int i = 0; i < values.length; i++) {
-            String paramName = listeParam[i].getName();
-            if (listeParam[i].isAnnotationPresent(Param.class)) {
-                paramName = listeParam[i].getAnnotation(Param.class).value();
-            } else if (!listeParam[i].getType().equals(CustomSession.class)){
-                String errorMess = "vous n'avez pas annoté le paramètre '"+paramName+"' par @Param(\"...\")"  ;
-                this.setStatusCode(500);
-                throw new Exception("<p>ETU-002415 : "+errorMess+"</p>");
-            }
-            
+            String paramName = checkAnnotationParam(listeParam[i]); // Check Annotation @Param
             if (listeParam[i].getType() == Part.class) {
                 try {
                     String name = listeParam[i].getAnnotation(Param.class).value();
@@ -232,46 +221,9 @@ public class FrontController extends HttpServlet {
                 if (!listeParam[i].getClass().isPrimitive() && listeParam[i].getType().isAnnotationPresent(Objet.class)) {
                     Class<?> clazz = Class.forName(listeParam[i].getParameterizedType().getTypeName());
                     Object obj = clazz.getDeclaredConstructor().newInstance();
-
                     Field[] fields = obj.getClass().getDeclaredFields();
-                    Object[] valuesObject = new Object[fields.length];
-                    while (formParameterNames.hasMoreElements()) {
-                        String name = formParameterNames.nextElement();
-                        for (int j = 0; j < fields.length; j++) {
-                            if (name.startsWith(paramName+".")) {
-                                int indexSuite = (paramName + ".").length();
-                                String paramSimpleName = name.substring(indexSuite);
-                                request.setAttribute(name, request.getParameter(name));
-
-                                if (fields[j].isAnnotationPresent(AttribObjet.class)){
-                                    if (paramSimpleName.equals(fields[j].getAnnotation(AttribObjet.class).value())){
-                                        if (Validation.validation(fields[j], request.getParameter(name)) != "") {
-                                            this.setStatusCode(401);
-                                            String error = Validation.validation(fields[j], request.getParameter(name));
-                                            request.setAttribute("error_"+name, error);
-                                            isErrorForm.set(true);
-                                        } else {
-                                            valuesObject[j] = TypeHandler.castParameter(request.getParameter(name), fields[j].getType().getName());
-                                            break;
-                                        }
-                                    } 
-                                } else {
-                                    if (paramSimpleName.equals(fields[j].getName())){
-                                        if (Validation.validation(fields[j], request.getParameter(name)) != "") {
-                                            String error = Validation.validation(fields[j], request.getParameter(name));
-                                            request.setAttribute("error_"+name, error);
-                                            isErrorForm.set(true);;
-                                        } else {
-                                            valuesObject[j] = TypeHandler.castParameter(request.getParameter(name), fields[j].getType().getName());
-                                            break;
-                                        }
-                                    }  
-                                }
-                            }
-                        }
-                    }
-
-                    obj = process(obj, valuesObject);
+                    Object[] fieldsObjectValues = getFieldsObjectValues(request, fields, formParamNames, isErrorForm , listeParam[i]);
+                    obj = process(obj, fieldsObjectValues);
                     values[i] = obj;
                 } else if (listeParam[i].getType().equals(CustomSession.class)) {
                     CustomSession session = new CustomSession(); 
@@ -280,8 +232,8 @@ public class FrontController extends HttpServlet {
                 }
                 else {
                     boolean isNull = true;
-                    while (formParameterNames.hasMoreElements()) {
-                        String name = formParameterNames.nextElement();
+                    while (formParamNames.hasMoreElements()) {
+                        String name = formParamNames.nextElement();
                         if (name.equals(paramName)) {
                             values[i] =TypeHandler.castParameter(request.getParameter(name), listeParam[i].getParameterizedType().getTypeName());
                             isNull = false;
@@ -295,6 +247,60 @@ public class FrontController extends HttpServlet {
             }
         }
         return values;
+    }
+
+    public Object[] getFieldsObjectValues(HttpServletRequest request, Field[] fields, Enumeration<String> formParamNames,
+                                            AtomicBoolean isErrorForm, Parameter parameter) throws Exception{
+        String paramName = checkAnnotationParam(parameter); 
+        Object[] fieldsObjectValues = new Object[fields.length]; 
+        while (formParamNames.hasMoreElements()) {
+            String name = formParamNames.nextElement();
+            for (int j = 0; j < fields.length; j++) {
+                if (name.startsWith(paramName+".")) {
+                    int indexSuite = (paramName + ".").length();
+                    String paramSimpleName = name.substring(indexSuite);
+                    request.setAttribute(name, request.getParameter(name));
+
+                    if (fields[j].isAnnotationPresent(AttribObjet.class)){
+                        if (paramSimpleName.equals(fields[j].getAnnotation(AttribObjet.class).value())){
+                            if (Validation.validation(fields[j], request.getParameter(name)) != "") {
+                                this.setStatusCode(401);
+                                String error = Validation.validation(fields[j], request.getParameter(name));
+                                request.setAttribute("error_"+name, error);
+                                isErrorForm.set(true);
+                            } else {
+                                fieldsObjectValues[j] = TypeHandler.castParameter(request.getParameter(name), fields[j].getType().getName());
+                                break;
+                            }
+                        } 
+                    } else {
+                        if (paramSimpleName.equals(fields[j].getName())){
+                            if (Validation.validation(fields[j], request.getParameter(name)) != "") {
+                                String error = Validation.validation(fields[j], request.getParameter(name));
+                                request.setAttribute("error_"+name, error);
+                                isErrorForm.set(true);;
+                            } else {
+                                fieldsObjectValues[j] = TypeHandler.castParameter(request.getParameter(name), fields[j].getType().getName());
+                                break;
+                            }
+                        }  
+                    }
+                }
+            }
+        }
+        return fieldsObjectValues;
+    }
+
+    public String checkAnnotationParam(Parameter param) throws Exception {
+        String paramName = param.getName();
+        if (param.isAnnotationPresent(Param.class)) {
+            paramName = param.getAnnotation(Param.class).value();
+        } else if (!param.getType().equals(CustomSession.class)){
+            String errorMess = "vous n'avez pas annoté le paramètre '"+paramName+"' par @Param(\"...\")"  ;
+            this.setStatusCode(500);
+            throw new Exception("<p>ETU-002415 : "+errorMess+"</p>");
+        }
+        return paramName;
     }
 
     public <T> T  process(T obj, Object[] valueObjects) throws Exception {
