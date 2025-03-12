@@ -1,2 +1,9 @@
+target/
 
-lib/servlet-api.jar
+
+.idea/
+*.iws
+*.iml
+*.ipr
+out/
+**/out/

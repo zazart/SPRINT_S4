@@ -1,9 +1,10 @@
 package mg.itu.prom16.controller;
 
+import jakarta.servlet.ServletConfig;
 import mg.itu.prom16.annotation.*;
-import mg.itu.prom16.annotation.verb.Get;
 import mg.itu.prom16.annotation.verb.Post;
 import mg.itu.prom16.models.ModelView;
+import mg.itu.prom16.models.Role;
 import mg.itu.prom16.models.VerbMethod;
 import mg.itu.prom16.utils.*;
 
@@ -11,7 +12,6 @@ import java.io.*;
 import java.net.URLDecoder;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.net.URL;
 
 import com.google.gson.Gson;
 
@@ -35,7 +35,8 @@ public class FrontController extends HttpServlet {
     private String controllerPackage;
     private HashMap <String,Mapping> urlMapping = new HashMap<>() ;
     private Exception exception = new Exception("");
-    private int statusCode = 200;
+    private int statusCode = 500;
+    private final List<Role> roles = new ArrayList<>();
     
     public void setStatusCode(int statusCode) {
         this.statusCode = statusCode;
@@ -87,14 +88,31 @@ public class FrontController extends HttpServlet {
             this.setException(new Exception("Le paramètre 'controller-package' doit être défini dans les paramètres d'initialisation."));
         } else {
             try {
+                ServletConfig config = getServletConfig();
+                Enumeration<String> initParams = config.getInitParameterNames();
+                while (initParams.hasMoreElements()) {
+                    String paramName = initParams.nextElement();
+                    if (paramName.startsWith("role-")) {
+                        String paramValue = getInitParameter(paramName);
+                        try {
+                            int level = Integer.parseInt(paramValue);
+                            String roleName = paramName.substring(5);
+                            this.roles.add(new Role(roleName, level));
+                        } catch (NumberFormatException e) {
+                            this.setStatusCode(500);
+                            throw new Exception("La valeur du paramètre " + paramName + " n'est pas un entier valide.");
+                        }
+                    }
+                }
                 scan();
             } catch (Exception e) {
                 this.setException(e);
-                e.printStackTrace();
             }
         }
-
     }
+
+
+
 
     @Override
     protected void doGet(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
@@ -108,7 +126,7 @@ public class FrontController extends HttpServlet {
 
     protected void processRequest(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
         PrintWriter out = response.getWriter();
-        if (this.getException().getMessage()!=""){ 
+        if (!Objects.equals(this.getException().getMessage(), "")) {
             response.sendError(this.getStatusCode(), this.getException().getMessage());
         } else {
             try {
@@ -116,6 +134,7 @@ public class FrontController extends HttpServlet {
                 out.println(reponse);
             } catch (Exception e) {
                 response.sendError(this.getStatusCode(), e.getMessage());
+                e.printStackTrace();
             }
         }
         out.close();
@@ -132,12 +151,13 @@ public class FrontController extends HttpServlet {
         if (this.getUrlMapping().containsKey(map)) {
             Mapping mapping = this.getUrlMapping().get(map);
             try {
-                String methodName = checkVerbMethod(request, mapping);
+                VerbMethod verbMethod = checkVerbMethod(request, mapping);
+                String methodName = verbMethod.getMethodName();
                 Class<?> classe = Class.forName(mapping.getClassName());
                 Object classInstance = classe.getDeclaredConstructor().newInstance();
                 checkCustomSession(request, classInstance);  // Check CustomSession
-
-                Boolean paramExist = false;
+                checkRoleAuthentification(request,verbMethod); // Auth (role)
+                boolean paramExist = false;
                 Method[] methods = classInstance.getClass().getDeclaredMethods();
                 for (Method item : methods) {
                     if (item.getName().equals(methodName)) {
@@ -161,7 +181,7 @@ public class FrontController extends HttpServlet {
             }
         } else {
             this.setStatusCode(404);
-            throw new Exception("<p>Il n'y a pas de méthode associée à ce chemin \""+requestURL+"\"</p>");
+            throw new Exception("Il n'y a pas de méthode associée à ce chemin \""+requestURL+"\"");
         }    
         return retour;
     }
@@ -179,7 +199,31 @@ public class FrontController extends HttpServlet {
 
     }
 
-    public String checkVerbMethod(HttpServletRequest request, Mapping mapping) throws Exception{
+    public void checkRoleAuthentification(HttpServletRequest request,VerbMethod verbMethod) throws Exception{
+        if (verbMethod.getRole() == null) {
+            return;
+        }
+        Exception e = new Exception("Page indisponible ! erreur d'authentification");
+        String sessionAttributeName = getServletContext().getInitParameter("auth");
+        if (sessionAttributeName == null || sessionAttributeName.trim().isEmpty()) {
+            sessionAttributeName = "auth"; // default value
+        }
+
+        Object role = request.getSession().getAttribute(sessionAttributeName);
+        if (role == null) {
+            this.setStatusCode(404);
+            throw e;
+        }
+        Role requiredRole = verbMethod.getRole();
+        Role admin = new Role(this.roles, (String)role );
+        if (!admin.hasAccessLevel(requiredRole)) {
+            this.setStatusCode(404);
+            throw e;
+        }
+    }
+
+
+    public VerbMethod checkVerbMethod(HttpServletRequest request, Mapping mapping) throws Exception{
         String verb = request.getMethod();
         int idverb = 0;
         for (int i=0; i < mapping.getListVerbMethod().size(); i++) {
@@ -196,7 +240,7 @@ public class FrontController extends HttpServlet {
             this.setStatusCode(500);
             throw new Exception("Le verb "+methodVerb+" au niveau de la methode ne correspond pas au method de la requete : "+verb );
         }
-        return methodName;
+        return mapping.getListVerbMethod().get(idverb);
     }
 
     public Object[] getValuesIfParamExist(HttpServletRequest request, Method[] methods, String methodName, AtomicBoolean isErrorForm) throws Exception {
@@ -278,7 +322,7 @@ public class FrontController extends HttpServlet {
                             if (Validation.validation(fields[j], request.getParameter(name)) != "") {
                                 String error = Validation.validation(fields[j], request.getParameter(name));
                                 request.setAttribute("error_"+name, error);
-                                isErrorForm.set(true);;
+                                isErrorForm.set(true);
                             } else {
                                 fieldsObjectValues[j] = TypeHandler.castParameter(request.getParameter(name), fields[j].getType().getName());
                                 break;
@@ -311,11 +355,7 @@ public class FrontController extends HttpServlet {
                 Field field = fields[i];
                 field.setAccessible(true);
                 Object valeur = valueObjects[i];
-                if(valeur != null){
-                    field.set(obj, valeur);
-                } else {
-                    field.set(obj, null);
-                }
+                field.set(obj, valeur);
             }
         } catch (Exception e) {
             this.setStatusCode(4321);
@@ -363,45 +403,36 @@ public class FrontController extends HttpServlet {
     }
 
     public void scan() throws Exception{
-        try {
-            String classesPath = getServletContext().getRealPath("/WEB-INF/classes");
-            String decodedPath = URLDecoder.decode(classesPath, "UTF-8");
-            String packagePath = decodedPath +"\\"+ this.getControllerPackage().replace('.', '\\');
-            File packageDirectory = new File(packagePath);
-            if (packageDirectory.exists() && packageDirectory.isDirectory()) {
-                File[] classFiles = packageDirectory.listFiles((dir, name) -> name.endsWith(".class"));
-                if (classFiles != null) {
-                    for (File classFile : classFiles) {
-                        String className = this.getControllerPackage() + '.' + classFile.getName().substring(0, classFile.getName().length() - 6);
-                        try {
-                            Class<?> classe = Class.forName(className);
-                            if (classe.isAnnotationPresent(Controller.class)) {
-                                this.getController().add(classe.getSimpleName());
-                                Method[] methods = classe.getMethods();
-                                subScan(methods, className);
-                            }
-                        } catch (ClassNotFoundException e) {
-                            throw e;
-                        }
-                    }
-                    if (this.getController().size()==0) {
-                        this.setStatusCode(500);
-                        throw new Exception("Il n'y aucun controller dans ce package");
+        String classesPath = getServletContext().getRealPath("/WEB-INF/classes");
+        String decodedPath = URLDecoder.decode(classesPath, "UTF-8");
+        String packagePath = decodedPath +"/"+ this.getControllerPackage().replace('.', '/');
+        File packageDirectory = new File(packagePath);
+        if (packageDirectory.exists() && packageDirectory.isDirectory()) {
+            File[] classFiles = packageDirectory.listFiles((dir, name) -> name.endsWith(".class"));
+            if (classFiles != null) {
+                for (File classFile : classFiles) {
+                    String className = this.getControllerPackage() + '.' + classFile.getName().substring(0, classFile.getName().length() - 6);
+                    Class<?> classe = Class.forName(className);
+                    if (classe.isAnnotationPresent(Controller.class)) {
+                        this.getController().add(classe.getSimpleName());
+                        Method[] methods = classe.getMethods();
+                        subScan(methods, className);
                     }
                 }
-            } else {
-                this.setStatusCode(500);
-                throw new Exception("Le package "+ this.getControllerPackage() +" n'existe pas");
+                if (this.getController().isEmpty()) {
+                    this.setStatusCode(500);
+                    throw new Exception("Il n'y aucun controller dans ce package");
+                }
             }
-        } catch (Exception e) {
-            throw e;
+        } else {
+            this.setStatusCode(500);
+            throw new Exception("Le package "+ this.getControllerPackage() +" n'existe pas");
         }
     }
     
     public void subScan(Method[] methods, String className) throws Exception {
         for (Method item : methods) {
             if (item.isAnnotationPresent(Url.class)) {
-                // Mapping(controller.name, method.name)
                 Mapping mapping = new Mapping(className);
                 String verb = "GET";
 
@@ -410,9 +441,14 @@ public class FrontController extends HttpServlet {
                 }
                 Url url = item.getAnnotation(Url.class);
                 String urlValue = url.value();
-                VerbMethod vm = new VerbMethod(item.getName(),verb);
+                Role role = null;
+                if (item.isAnnotationPresent(Auth.class)) {
+                    Auth auth = item.getAnnotation(Auth.class);
+                    String nameRole = auth.role();
+                    role = new Role(this.roles, nameRole);
+                }
+                VerbMethod vm = new VerbMethod(item.getName(),verb,role);
 
-                // HashMap.associer(annotation.value, mapping)
                 if (!this.getUrlMapping().containsKey(urlValue)){
                     mapping.addVerbMethod(vm);
                     this.getUrlMapping().put(urlValue, mapping);
