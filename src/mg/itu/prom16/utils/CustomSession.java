@@ -13,7 +13,6 @@ public class CustomSession {
         this.mySession = mySession;
     }
 
-
     public void add(String key, Object value) {
         this.mySession.setAttribute(key, value);
     }
@@ -29,4 +28,11 @@ public class CustomSession {
     public void update(String key, Object value) {
         this.mySession.setAttribute(key, value);
     }
+
+    public void destroy() {
+        if (this.mySession != null) {
+            this.mySession.invalidate();
+        }
+    }
+
 }

@@ -1,6 +1,7 @@
 package mg.itu.prom16.models;
 
 public class VerbMethod {
+    Role role;
     String methodName;
     String verb;
 
@@ -8,9 +9,10 @@ public class VerbMethod {
         
     }
 
-    public VerbMethod(String methodName, String verb) {
+    public VerbMethod(String methodName, String verb, Role role) {
         this.methodName = methodName;
         this.verb = verb;
+        this.role = role;
     }
 
     public String getMethodName() {
@@ -24,5 +26,13 @@ public class VerbMethod {
     }
     public void setVerb(String verb) {
         this.verb = verb;
-    } 
+    }
+
+    public Role getRole() {
+        return role;
+    }
+
+    public void setRole(Role role) {
+        this.role = role;
+    }
 }

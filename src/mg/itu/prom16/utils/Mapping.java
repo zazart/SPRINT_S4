@@ -29,6 +29,7 @@ public class Mapping {
         for (VerbMethod vm : this.listVerbMethod) {
             if (vm.getVerb().equals(verbMethod.getVerb())) {
                 retour = true;
+                break;
             }
         }
         return retour;
