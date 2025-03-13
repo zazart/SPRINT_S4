@@ -46,6 +46,15 @@ public class Role {
         }
     }
 
+    public void applyParentRoleIfWeaker(Role superRole) {
+        if (superRole == null) {
+            return;
+        }
+        if (this.getLevel() > superRole.getLevel()) { // hiérarchie croissante
+            this.setLevel(superRole.getLevel());
+            this.setName(superRole.getName());
+        }
+    }
 
     public boolean hasAccessLevel(Role requiredRole) {
         return this.getLevel() <= requiredRole.getLevel() & this.getLevel() != -1;
