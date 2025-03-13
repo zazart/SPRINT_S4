@@ -1,9 +1,11 @@
 package mg.itu.prom16.utils;
 
+import mg.itu.prom16.models.Role;
 import mg.itu.prom16.models.VerbMethod;
 import java.util.*;
 
 public class Mapping {
+    Role role;
     String className;
     List<VerbMethod> listVerbMethod = new ArrayList<>() ;
 
@@ -33,6 +35,14 @@ public class Mapping {
             }
         }
         return retour;
+    }
+
+    public Role getRole() {
+        return role;
+    }
+
+    public void setRole(Role role) {
+        this.role = role;
     }
 
     public List<VerbMethod> getListVerbMethod() {

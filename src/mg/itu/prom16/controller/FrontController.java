@@ -431,9 +431,18 @@ public class FrontController extends HttpServlet {
     }
     
     public void subScan(Method[] methods, String className) throws Exception {
+        Class<?> classe = Class.forName(className);
+        Role superRole = null;
+        if (classe.isAnnotationPresent(Auth.class)) {
+            Auth auth = classe.getAnnotation(Auth.class);
+            String nameRole = auth.role();
+            superRole = new Role(this.roles, nameRole);
+        }
+
         for (Method item : methods) {
             if (item.isAnnotationPresent(Url.class)) {
                 Mapping mapping = new Mapping(className);
+                mapping.setRole(superRole);
                 String verb = "GET";
 
                 if (item.isAnnotationPresent(Post.class)){
@@ -446,6 +455,11 @@ public class FrontController extends HttpServlet {
                     Auth auth = item.getAnnotation(Auth.class);
                     String nameRole = auth.role();
                     role = new Role(this.roles, nameRole);
+                }
+                if (role != null) {
+                    role.applyParentRoleIfWeaker(superRole);
+                } else {
+                    role = superRole;
                 }
                 VerbMethod vm = new VerbMethod(item.getName(),verb,role);
 
