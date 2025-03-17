@@ -377,6 +377,11 @@ public class FrontController extends HttpServlet {
         }
         if (result instanceof ModelView){
             ModelView mv = (ModelView) result;
+            if (mv.getUrl().startsWith("redirect:")) {
+                mv.setUrl(mv.getUrl().substring("redirect:".length()));
+                response.sendRedirect(mv.getUrl());
+                return "";
+            }
             RequestDispatcher dispatch = request.getRequestDispatcher(mv.getUrl());
             Set<String> keys = mv.getData().keySet();
             for (String key : keys) {
