@@ -166,7 +166,7 @@ public class FrontController extends HttpServlet {
                 }
                 if (paramExist) {
                     Object[] values = getValuesIfParamExist(request, methods, methodName, isErrorForm);
-                    Class<?>[] parameterTypes = TypeHandler.checkParameterTypes(values);
+                    Class<?>[] parameterTypes = TypeHandler.checkParameterTypes(methods,methodName);
                     Method method = classe.getDeclaredMethod(methodName, parameterTypes);
                     Object result = method.invoke(classInstance,values);
                     retour += resultHandler(result, request, response, method, isErrorForm);
@@ -377,6 +377,11 @@ public class FrontController extends HttpServlet {
         }
         if (result instanceof ModelView){
             ModelView mv = (ModelView) result;
+            if (mv.getUrl().startsWith("redirect:")) {
+                mv.setUrl(mv.getUrl().substring("redirect:".length()));
+                response.sendRedirect(mv.getUrl());
+                return "";
+            }
             RequestDispatcher dispatch = request.getRequestDispatcher(mv.getUrl());
             Set<String> keys = mv.getData().keySet();
             for (String key : keys) {
