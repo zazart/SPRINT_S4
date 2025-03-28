@@ -166,7 +166,7 @@ public class FrontController extends HttpServlet {
                 }
                 if (paramExist) {
                     Object[] values = getValuesIfParamExist(request, methods, methodName, isErrorForm);
-                    Class<?>[] parameterTypes = TypeHandler.checkParameterTypes(values);
+                    Class<?>[] parameterTypes = TypeHandler.checkParameterTypes(methods,methodName);
                     Method method = classe.getDeclaredMethod(methodName, parameterTypes);
                     Object result = method.invoke(classInstance,values);
                     retour += resultHandler(result, request, response, method, isErrorForm);
