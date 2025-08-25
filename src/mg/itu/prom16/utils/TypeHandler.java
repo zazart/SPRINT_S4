@@ -2,6 +2,11 @@ package mg.itu.prom16.utils;
 
 import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
+import java.text.SimpleDateFormat;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.util.Date;
 
 public class TypeHandler {
 
@@ -26,42 +31,45 @@ public class TypeHandler {
             default:
                 return Class.forName(typeName);
         }
-    } 
+    }
 
     public static Object castParameter(String value, String type) throws Exception {
         Class<?> classe = checkClassForName(type);
-        if (value == null) {
-            if (classe == String.class) {
-                return "";
-            } else if (classe == Integer.class || classe == int.class) {
-                return 0;
-            } else if (classe == Double.class || classe == double.class) {
-                return 0.0;
-            }
-            return null;
+
+        if (value == null || value.isEmpty()) {
+            if (classe == String.class) return "";
+            else if (classe == Integer.class || classe == int.class) return 0;
+            else if (classe == Double.class || classe == double.class) return 0.0;
+            else if (classe == Boolean.class || classe == boolean.class) return false;
+            else if (classe == Long.class || classe == long.class) return 0L;
+            else if (classe == Float.class || classe == float.class) return 0.0f;
+            else if (classe == Short.class || classe == short.class) return (short) 0;
+            else if (classe == Byte.class || classe == byte.class) return (byte) 0;
+            else return null;
         }
 
-        if (classe == String.class) {
-            return value;
-        } else if (classe == Integer.class || classe == int.class) {
-            return Integer.parseInt(value);
-        } else if (classe == Double.class || classe == double.class) {
-            return Double.parseDouble(value);
-        } else if (classe == Boolean.class || classe == boolean.class) {
-            return Boolean.parseBoolean(value);
-        } else if (classe == Long.class || classe == long.class) {
-            return Long.parseLong(value);
-        } else if (classe == Float.class || classe == float.class) {
-            return Float.parseFloat(value);
-        } else if (classe == Short.class || classe == short.class) {
-            return Short.parseShort(value);
-        } else if (classe == Byte.class || classe == byte.class) {
-            return Byte.parseByte(value);
-        } else {
-            throw new Exception("Erreur de cast sur "+type);
+        if (classe == String.class) return value;
+        else if (classe == Integer.class || classe == int.class) return Integer.parseInt(value);
+        else if (classe == Double.class || classe == double.class) return Double.parseDouble(value);
+        else if (classe == Boolean.class || classe == boolean.class) return Boolean.parseBoolean(value);
+        else if (classe == Long.class || classe == long.class) return Long.parseLong(value);
+        else if (classe == Float.class || classe == float.class) return Float.parseFloat(value);
+        else if (classe == Short.class || classe == short.class) return Short.parseShort(value);
+        else if (classe == Byte.class || classe == byte.class) return Byte.parseByte(value);
+
+        else if (classe == LocalDate.class) {
+            return LocalDate.parse(value);
+        } else if (classe == LocalTime.class) {
+            return LocalTime.parse(value);
+        } else if (classe == LocalDateTime.class) {
+            return LocalDateTime.parse(value);
+        } else if (classe == Date.class) {
+            SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm");
+            return sdf.parse(value);
         }
+
+        throw new Exception("Erreur de cast sur " + type);
     }
-
 
     public static Class<?>[] checkParameterTypes(Method[] methods, String methodName) {
         Parameter[] listeParam = null;

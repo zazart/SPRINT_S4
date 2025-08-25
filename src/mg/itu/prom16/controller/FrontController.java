@@ -142,12 +142,14 @@ public class FrontController extends HttpServlet {
 
     public String subProcessRequest(HttpServletRequest request, HttpServletResponse response) throws Exception {
         StringBuffer requestURL = request.getRequestURL();
-        String[] requestUrlSplitted = requestURL.toString().split("/");
-        String map = requestUrlSplitted[requestUrlSplitted.length-1];
+        String pathInfo = request.getRequestURI();
+        String map = pathInfo.substring(request.getContextPath().length());
         String retour = "";
         AtomicBoolean isErrorForm = new AtomicBoolean(false);
-        if (requestUrlSplitted.length <=4 ) {map = "/" ;}
 
+        if (map.length() > 1) {
+            map = map.substring(1);
+        }
         if (this.getUrlMapping().containsKey(map)) {
             Mapping mapping = this.getUrlMapping().get(map);
             try {
@@ -230,10 +232,10 @@ public class FrontController extends HttpServlet {
             if (mapping.getListVerbMethod().get(i).getVerb().equals(verb)) {
                 idverb = i;
             }
-        } 
+        }
         String methodVerb = mapping.getListVerbMethod().get(idverb).getVerb();
         String methodName = mapping.getListVerbMethod().get(idverb).getMethodName();
-        if (request.getAttribute("error")!=null) {
+        if (request.getAttribute("error") != null || request.getParameter("error") != null) {
             verb = "GET";
         }
         if (!verb.equals(methodVerb)) {
@@ -371,6 +373,9 @@ public class FrontController extends HttpServlet {
             request.setAttribute("error", "value");
             ModelView mv = (ModelView) result;
             String referer = mv.getError();
+            if (!referer.startsWith("/")) {
+                referer = "/" + referer;
+            }
             RequestDispatcher dispatcher = request.getRequestDispatcher(referer);
             dispatcher.forward(request, response);
             return "";
@@ -379,10 +384,14 @@ public class FrontController extends HttpServlet {
             ModelView mv = (ModelView) result;
             if (mv.getUrl().startsWith("redirect:")) {
                 mv.setUrl(mv.getUrl().substring("redirect:".length()));
-                response.sendRedirect(mv.getUrl());
+                response.sendRedirect(request.getContextPath() + "/" + mv.getUrl());
                 return "";
             }
-            RequestDispatcher dispatch = request.getRequestDispatcher(mv.getUrl());
+            String url = mv.getUrl();
+            if (!url.startsWith("/")) {
+                url = "/" + url;
+            }
+            RequestDispatcher dispatch = request.getRequestDispatcher(url);
             Set<String> keys = mv.getData().keySet();
             for (String key : keys) {
                 request.setAttribute(key, mv.getData().get(key));
